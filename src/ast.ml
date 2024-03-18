@@ -23,7 +23,7 @@ open Batteries
 *)
 
 type tag = Tassign | Tif | Twhile | Tblock | Treturn | Tprint
-         | Tint
+         | Tint | Tvar
          | Tadd | Tmul | Tdiv | Tmod | Txor | Tsub
          | Tclt | Tcgt | Tcle | Tcge | Tceq | Tne
          | Tneg
@@ -53,6 +53,7 @@ let string_of_tag = function
   | Treturn -> "Treturn"
   | Tprint -> "Tprint"
   | Tint -> "Tint"
+  | Tvar -> "Tvar"
   | Tadd -> "Tadd"
   | Tmul -> "Tmul"
   | Tdiv -> "Tdiv"

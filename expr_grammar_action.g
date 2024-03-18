@@ -28,7 +28,7 @@ let resolve_associativity term other =
 rules
 S -> FUNDEFS SYM_EOF {  Node (Tlistglobdef, $1) }
 
-IDENTIFIER -> SYM_IDENTIFIER { StringLeaf($1) }
+IDENTIFIER -> SYM_IDENTIFIER { Node(Tvar, [StringLeaf($1)]) }
 INTEGER -> SYM_INTEGER { Node(Tint, [IntLeaf($1)]) }
 
 FUNDEFS -> { [] }
