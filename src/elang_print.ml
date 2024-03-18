@@ -57,7 +57,7 @@ let rec dump_einstr_rec indent oc i =
     Format.fprintf oc "return %s;\n" (dump_eexpr e)
   | Iprint(e) ->
     print_spaces oc indent;
-    Format.fprintf oc "print %s;\n" (dump_eexpr e)
+    Format.fprintf oc "print(%s);\n" (dump_eexpr e)
 
 let dump_einstr oc i = dump_einstr_rec 0 oc i
 

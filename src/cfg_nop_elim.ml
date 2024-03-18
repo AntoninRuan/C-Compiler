@@ -14,8 +14,11 @@ open Options
    Si le nœud [n] contient [Cnop s], alors [(n,s)] devrait être dans le résultat.
 *)
 let nop_transitions (cfgfunbody: (int, cfg_node) Hashtbl.t) : (int * int) list =
-   (* TODO *)
-   []
+   Hashtbl.fold (fun key value acc -> 
+      match value with 
+      | Cnop next -> (key, next)::acc
+      | _ -> acc   
+   ) cfgfunbody []
 
 
 (* [follow n l visited] donne le premier successeur à partir de [n] qui ne soit
@@ -27,8 +30,12 @@ let nop_transitions (cfgfunbody: (int, cfg_node) Hashtbl.t) : (int * int) list =
    L'ensemble [visited] est utilisé pour éviter les boucles.
    *)
 let rec follow (n: int) (l: (int * int) list) (visited: int Set.t) : int =
-   (* TODO *)
-   n
+   let is_nop = List.mem_assoc n l 
+   in if is_nop then
+      let s = List.assoc n l 
+      in if Set.mem s visited then n else follow s l (Set.union visited (Set.singleton n))
+   else 
+      n
 
 (* [nop_transitions_closed] contient la liste [(n,s)] telle que l'instruction au
    nœud [n] est le début d'une chaîne de NOPs qui termine au nœud [s]. Les
@@ -47,14 +54,17 @@ let nop_transitions_closed cfgfunbody =
 (* [replace_succ nop_succs s] donne le nouveau nom du nœud [s], en utilisant la
    liste [nop_succs] (telle que renvoyée par [nop_transitions_closed]). *)
 let replace_succ nop_succs s =
-   (* TODO *)
-   s
+   if List.mem_assoc s nop_succs then List.assoc s nop_succs else s
 
 (* [replace_succs nop_succs n] remplace le nœud [n] par un nœud équivalent où on
    a remplacé les successeurs, en utilisant la liste [nop_succs]. *)
 let replace_succs nop_succs (n: cfg_node) =
-   (* TODO *)
-   n
+   match n with 
+   | Cassign (var, expr, next) -> Cassign(var, expr, replace_succ nop_succs next)
+   | Creturn expr -> n
+   | Cprint (expr, next) -> Cprint(expr, replace_succ nop_succs next)
+   | Ccmp (expr, lnext, rnext) -> Ccmp(expr, replace_succ nop_succs lnext, replace_succ nop_succs rnext)
+   | Cnop next -> Cnop(replace_succ nop_succs next)
 
 (* [nop_elim_fun f] applique la fonction [replace_succs] à chaque nœud du CFG. *)
 let nop_elim_fun ({ cfgfunargs; cfgfunbody; cfgentry } as f: cfg_fun) =
@@ -68,8 +78,9 @@ let nop_elim_fun ({ cfgfunargs; cfgfunbody; cfgentry } as f: cfg_fun) =
      resteront.
   *)
   let cfgfunbody = Hashtbl.filter_map (fun n node ->
-         (* TODO *)
-         Some node
+         match node with
+         | Cnop next -> None
+         | _ -> Some (replace_succs nop_transf node)
     ) cfgfunbody in
   (* La fonction renvoyée est composée du nouveau [cfgfunbody] que l'on vient de
      calculer, et le point d'entrée est transformé en conséquence. *)
