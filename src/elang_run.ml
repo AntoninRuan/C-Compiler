@@ -9,17 +9,32 @@ let binop_bool_to_int f x y = if f x y then 1 else 0
    et [y]. *)
 let eval_binop (b: binop) : int -> int -> int =
   match b with
-   | _ -> fun x y -> 0
+   | Eadd -> fun x y -> x + y
+   | Emul -> fun x y -> x * y
+   | Emod -> fun x y -> x mod y
+   | Exor -> fun x y -> x lxor y
+   | Ediv -> fun x y -> x / y
+   | Esub -> fun x y -> x - y
+   | Eclt -> fun x y -> Bool.to_int (x < y)
+   | Ecle -> fun x y -> Bool.to_int (x <= y)
+   | Ecgt -> fun x y -> Bool.to_int (x > y)
+   | Ecge -> fun x y -> Bool.to_int (x >= y)
+   | Eceq -> fun x y -> Bool.to_int (x = y)
+   | Ecne -> fun x y -> Bool.to_int (x <> y)
 
 (* [eval_unop u x] évalue l'opération unaire [u] sur l'argument [x]. *)
 let eval_unop (u: unop) : int -> int =
   match u with
-   | _ -> fun x -> 0
+   | Eneg -> fun x -> -x
 
 (* [eval_eexpr st e] évalue l'expression [e] dans l'état [st]. Renvoie une
    erreur si besoin. *)
-let rec eval_eexpr st (e : expr) : int res =
-   Error "eval_eexpr not implemented yet."
+let rec eval_eexpr (st: int state) (e : expr) : int res =
+   match e with 
+   | Ebinop (op, x, y) -> let x = (eval_eexpr st x) >>! identity and y = (eval_eexpr st y) >>! identity in OK ((eval_binop op) x y)
+   | Eunop (op, x) -> let x = (eval_eexpr st x) >>! identity in OK ((eval_unop op) x)
+   | Eint x -> OK(x)
+   | Evar str -> option_to_res_bind (Hashtbl.find_option st.env str) (Printf.sprintf "Variable %s not declared" str) (fun a -> OK(a))
 
 (* [eval_einstr oc st ins] évalue l'instrution [ins] en partant de l'état [st].
 
@@ -35,7 +50,24 @@ let rec eval_eexpr st (e : expr) : int res =
    - [st'] est l'état mis à jour. *)
 let rec eval_einstr oc (st: int state) (ins: instr) :
   (int option * int state) res =
-   Error "eval_einstr not implemented yet."
+   match ins with
+   | Iassign (str, exp) -> let result = (eval_eexpr st exp) >>! identity in Hashtbl.replace st.env str result; OK (None, st)
+   | Iif (cnd, if_instr, else_instr) -> if ((eval_eexpr st cnd) >>! identity) = 1 then (eval_einstr oc st if_instr) else eval_einstr oc st else_instr
+   | Iwhile (cnd, instr) -> let res = ref (None, st)  and cont = ref true in 
+      while (((eval_eexpr st cnd) >>! identity) = 1) && !cont do 
+         res := (eval_einstr oc st instr) >>! identity; 
+         (match !res with
+         | (Some v, _) -> cont := false; ()
+         | (None, _) -> cont := true; ()
+         );
+      done;
+      OK (!res)
+   | Iblock instrs -> List.fold_left (fun acc elt -> 
+      let (old_res, old_st) = acc >>! identity in 
+      (match old_res with | None -> (eval_einstr oc old_st elt) | Some value -> acc)
+      ) (OK (None, st)) instrs 
+   | Ireturn expr -> let value = (eval_eexpr st expr) >>! identity in OK (Some value, st)
+   | Iprint expr -> let value = (eval_eexpr st expr) >>! identity in Format.fprintf oc "%d\n" value; OK (None, st)
 
 (* [eval_efun oc st f fname vargs] évalue la fonction [f] (dont le nom est
    [fname]) en partant de l'état [st], avec les arguments [vargs].
@@ -85,5 +117,6 @@ let eval_eprog oc (ep: eprog) (memsize: int) (params: int list)
   (* ne garde que le nombre nécessaire de paramètres pour la fonction "main". *)
   let n = List.length f.funargs in
   let params = take n params in
+  List.iter2 (fun name value -> Hashtbl.replace st.env name value) f.funargs params;
   eval_efun oc st f "main" params >>= fun (v, _) ->
   OK v

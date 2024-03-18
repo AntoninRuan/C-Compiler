@@ -6,7 +6,7 @@ open Options
 open Symbols
 
 let tokenize_handwritten file =
-  Printf.printf "Handwritten lexer\n";
+  (* Printf.printf "Handwritten lexer\n"; *)
   Lexer_generator.tokenize_file file >>= fun tokens ->
   OK (List.map (fun tok -> (tok, None)) tokens)
 

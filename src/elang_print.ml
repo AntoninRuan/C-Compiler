@@ -63,7 +63,7 @@ let dump_einstr oc i = dump_einstr_rec 0 oc i
 
 
 let dump_efun oc funname {funargs; funbody} =
-  Format.fprintf oc "%s(%s) {\n%a\n}\n"
+  Format.fprintf oc "%s(%s) %a\n"
     funname
     (String.concat "," funargs)
     dump_einstr funbody
