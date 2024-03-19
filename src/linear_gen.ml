@@ -28,14 +28,23 @@ let sort_blocks (nodes: (int, rtl_instr list) Hashtbl.t) entry =
 
 (* Supprime les jumps inutiles (Jmp à un label défini juste en dessous). *)
 let rec remove_useless_jumps (l: rtl_instr list) =
-   (* TODO *)
-   l
+  List.fold_right (fun elt acc -> match acc with
+  | Rlabel(x)::q when elt = Rjmp(x) -> acc
+  | _ -> elt::acc) l []
 
 
 (* Remove labels that are never jumped to. *)
 let remove_useless_labels (l: rtl_instr list) =
-   (* TODO *)
-   l
+  let jumps = List.filter (fun elt -> match elt with Rjmp x -> true | _ -> false) l in
+  let jumps_to = List.fold_left (fun acc elt -> 
+    Set.union acc (match elt with | Rjmp x -> Set.singleton x | _ -> Set.empty)  
+  ) Set.empty jumps in
+  let branch = List.filter (fun elt -> match elt with Rbranch (_, _, _, _) -> true | _ -> false) l in
+  let branch_to = List.fold_left (fun acc elt -> 
+    Set.union acc (match elt with | Rbranch(_, _, _, x) -> Set.singleton x | _ -> Set.empty)
+  ) Set.empty branch in
+  let used_labels = List.filter (fun elt -> match elt with Rlabel x -> Set.mem x (Set.union jumps_to branch_to) | _ -> false) l in
+  List.filter (fun elt -> match elt with Rlabel x -> List.mem elt used_labels | _ -> true) l
 
 let linear_of_rtl_fun
     ({ rtlfunargs; rtlfunbody; rtlfunentry; rtlfuninfo }: rtl_fun) =
