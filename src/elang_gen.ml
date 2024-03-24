@@ -51,6 +51,8 @@ let rec make_eexpr_of_ast (a: tree) : expr res =
         OK (Eunop (Eneg, subtree))
     | Node(t, [IntLeaf x]) when t = Tint -> OK (Eint x)
     | Node(t, [StringLeaf s]) when t = Tvar -> OK(Evar s)
+    | Node(t, [StringLeaf s; Node(Targs, args)]) when t = Tfuncall -> let subtree_list = List.map make_eexpr_of_ast args in 
+        let args_list = List.map (fun elt -> error_fail elt identity) subtree_list in OK (Ecall(s, args_list))
     | _ -> Error (Printf.sprintf "Unacceptable ast in make_eexpr_of_ast %s"
                     (string_of_ast a))
   in
@@ -62,7 +64,7 @@ let rec make_eexpr_of_ast (a: tree) : expr res =
 let rec make_einstr_of_ast (a: tree) : instr res =
   let res =
     match a with
-    | Node(t, list) when t = Tblock -> let subtree_list = List.map (fun elt -> make_einstr_of_ast elt) list in
+    | Node(t, list) when t = Tblock -> let subtree_list = List.map make_einstr_of_ast list in
         let instr_list = List.map (fun elt -> error_fail elt identity) subtree_list in
         OK (Iblock instr_list)
     | Node(t, subtree) when t = Tif -> (
@@ -87,6 +89,8 @@ let rec make_einstr_of_ast (a: tree) : instr res =
         | (Evar str) -> OK (Iassign (str, eexpr))
         | _ -> Error (Printf.sprintf "Unacceptable ast in make_einstr_of_ast %s. Left subtree must be of type Tvar when in Tassign" (string_of_ast a))
       )
+    | Node(t, [StringLeaf s; Node(Targs, args)]) when t = Tfuncall -> let subtree_list = List.map make_eexpr_of_ast args in
+        let args_list = List.map (fun elt -> error_fail elt identity) subtree_list in OK (Icall (s, args_list))
     | _ -> Error (Printf.sprintf "Unacceptable ast in make_einstr_of_ast %s"
                     (string_of_ast a))
   in

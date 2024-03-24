@@ -1,0 +1,73 @@
+
+    <html>
+    <head>
+    <link rel="stylesheet" href="w3.css">
+    <script src="https://kit.fontawesome.com/1f5d81749b.js" crossorigin="anonymous"></script>
+    <style type="text/css">
+    /*
+    table , table th, table td , table tr{
+        border: 1px solid black;
+        border-collapse: collapse;
+        text-align: center;
+    }
+    .rowname, th {
+        background-color: #ccc;
+    }
+    td {
+        padding: 0.4em;
+    }
+    .bad{
+        background-color: #f9d7dc;
+    }
+    .good{
+        background-color: #c7f0d2;
+    }
+    .warn{
+        background-color: orange;
+    }
+    
+    fieldset {
+        display: inline;
+        margin: 1em;
+        padding: 1em;
+    }*/
+    </style>
+    <script type="text/javascript">
+    function toggleVisibility(elt){
+      if (elt.style.display == 'none')
+        elt.style.display = 'block';
+      else
+        elt.style.display = 'none';
+    }
+
+    function toggle(name){
+      var elts = document.getElementsByName(name);
+      console.log(elts);
+      for (var k = 0; k < elts.length; k++){
+        toggleVisibility(elts[k]);
+      }
+      var x = document.getElementById('toggle'+name);
+      if (x.value == '+') x.value = '-';
+      else x.value = '+';
+    }
+    </script>
+    </head>
+    <body>2024-03-24 20:54:26.498216
+    <table class="w3-table w3-striped w3-responsive">
+    <tr><th>File</th><th style='transform: rotate(180deg); writing-mode: vertical-rl;'>Lexer</th>
+<th style='transform: rotate(180deg); writing-mode: vertical-rl;'>Parser</th>
+<th style='transform: rotate(180deg); writing-mode: vertical-rl;'>e-run</th>
+<th style='transform: rotate(180deg); writing-mode: vertical-rl;'>cfg-run</th>
+<th style='transform: rotate(180deg); writing-mode: vertical-rl;'>cfg-run-after-cp</th>
+<th style='transform: rotate(180deg); writing-mode: vertical-rl;'>cfg-run-after-dae</th>
+<th style='transform: rotate(180deg); writing-mode: vertical-rl;'>cfg-run-after-ne</th>
+<th style='transform: rotate(180deg); writing-mode: vertical-rl;'>rtl-run</th>
+<th style='transform: rotate(180deg); writing-mode: vertical-rl;'>linear-run</th>
+<th style='transform: rotate(180deg); writing-mode: vertical-rl;'>linear-run-after-dse</th>
+<th style='transform: rotate(180deg); writing-mode: vertical-rl;'>ltl-run</th>
+<th style='transform: rotate(180deg); writing-mode: vertical-rl;'>riscv-run</th>
+
+    </tr>
+    </table>
+</body>
+</html>
