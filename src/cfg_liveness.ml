@@ -10,6 +10,7 @@ let rec vars_in_expr (e: expr) =
    | Eunop  (_, expr) -> vars_in_expr expr
    | Eint int -> Set.empty
    | Evar string -> Set.singleton string
+   | Ecall (string, args) -> List.fold_left (fun acc elt -> Set.union acc (vars_in_expr elt)) Set.empty args
 
 (* [live_after_node cfg n] renvoie l'ensemble des variables vivantes après le
    nœud [n] dans un CFG [cfg]. [lives] est l'état courant de l'analyse,
@@ -28,6 +29,7 @@ let live_cfg_node (node: cfg_node) (live_after: string Set.t) =
    | Cprint (expr, next) -> (vars_in_expr expr, Set.empty)
    | Ccmp (expr, lnext, rnext) -> (vars_in_expr expr, Set.empty)
    | Cnop int -> (Set.empty, Set.empty)
+   | Ccall (str, args, next) -> (List.fold_left (fun acc elt -> Set.union acc (vars_in_expr elt)) Set.empty args, Set.empty)
    )
    in Set.union use (Set.diff live_after def)
 

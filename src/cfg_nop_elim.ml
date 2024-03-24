@@ -65,6 +65,7 @@ let replace_succs nop_succs (n: cfg_node) =
    | Cprint (expr, next) -> Cprint(expr, replace_succ nop_succs next)
    | Ccmp (expr, lnext, rnext) -> Ccmp(expr, replace_succ nop_succs lnext, replace_succ nop_succs rnext)
    | Cnop next -> Cnop(replace_succ nop_succs next)
+   | Ccall (str, args, next) -> Ccall(str, args, replace_succ nop_succs next)
 
 (* [nop_elim_fun f] applique la fonction [replace_succs] à chaque nœud du CFG. *)
 let nop_elim_fun ({ cfgfunargs; cfgfunbody; cfgentry } as f: cfg_fun) =

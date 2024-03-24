@@ -50,20 +50,17 @@ LPARAMS -> IDENTIFIER { Node(Targ, [ Node(Tvar, [$1]) ]) }
 ELSE -> { Node(Tblock, []) }
 ELSE -> SYM_ELSE SYM_LBRACE INSTRS SYM_RBRACE { Node(Tblock, $3) }
 
-LINSTRS -> { [] }
-LINSTRS -> INSTR LINSTRS { $1::$2 }
-
 INSTRS -> { [] }
-INSTRS -> INSTR LINSTRS { $1::$2 }
+INSTRS -> INSTR INSTRS { $1::$2 }
 
 INSTR -> SYM_LBRACE INSTRS SYM_RBRACE { Node(Tblock, $2) }
 INSTR -> SYM_IF SYM_LPARENTHESIS EXPR SYM_RPARENTHESIS SYM_LBRACE INSTRS SYM_RBRACE ELSE { Node(Tif, [$3] @ [Node(Tblock, $6)] @ [$8]) }
 INSTR -> SYM_WHILE SYM_LPARENTHESIS EXPR SYM_RPARENTHESIS INSTR { Node(Twhile, [$3; $5]) }
 INSTR -> SYM_RETURN EXPR SYM_SEMICOLON { Node(Treturn, [$2]) }
 INSTR -> SYM_PRINT EXPR SYM_SEMICOLON { Node(Tprint, [$2]) }
-INSTR -> IDENTIFIER ASSIGN_OR_FUN_CALL { $2 $1 }
+INSTR -> IDENTIFIER ASSIGN_OR_FUN_CALL SYM_SEMICOLON { $2 $1 }
 
-ASSIGN_OR_FUN_CALL -> SYM_ASSIGN EXPR SYM_SEMICOLON { fun x -> Node(Tassign, [Node(Tvar, [x]); $2]) }
+ASSIGN_OR_FUN_CALL -> SYM_ASSIGN EXPR { fun x -> Node(Tassign, [Node(Tvar, [x]); $2]) }
 ASSIGN_OR_FUN_CALL -> FUN_CALL { $1 }
 
 EXPR -> EQ_EXPR EQ_EXPRS { resolve_associativity $1 $2 }
