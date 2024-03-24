@@ -32,6 +32,7 @@ let find_var (next_reg, var2reg) v =
     | Some r -> (r, next_reg, var2reg)
     | None -> (next_reg, next_reg + 1, assoc_set var2reg v next_reg)
 
+
 (* [rtl_instrs_of_cfg_expr (next_reg, var2reg) e] construit une liste
    d'instructions RTL correspondant à l'évaluation d'une expression E.
 
@@ -51,6 +52,15 @@ let rec rtl_instrs_of_cfg_expr (next_reg, var2reg) (e: expr) =
     in (r, rexprs @ [Runop(unop, next_reg, r)], next_reg + 1, var2reg)
   | Eint value -> (next_reg, [Rconst(next_reg, value)], next_reg + 1, var2reg)
   | Evar var -> let (r, next_reg, var2reg) = find_var (next_reg, var2reg) var in (r, [], next_reg, var2reg)
+  | Ecall (str, args) -> 
+    let reg_list, rexprs, next_reg, var2reg = rtl_instrs_of_cfg_fun_call_args (next_reg, var2reg) args in
+    (next_reg, rexprs @ [Rcall(Some next_reg, str, reg_list)], next_reg + 1, var2reg)
+
+and rtl_instrs_of_cfg_fun_call_args (next_reg, var2reg) (args: Cfg.expr list) = 
+  List.fold_left (fun (reg_list, lexprs, next_reg, var2reg) elt -> 
+    let r, rexprs, next_reg, var2reg = rtl_instrs_of_cfg_expr (next_reg, var2reg) elt
+    in (reg_list @ [r], lexprs @ rexprs, next_reg, var2reg)
+  ) ([], [], next_reg, var2reg) args
    
 
 let is_cmp_op =
@@ -85,6 +95,9 @@ let rtl_instrs_of_cfg_node ((next_reg:int), (var2reg: (string*int) list)) (c: cf
     in let (rr, rrexprs, next_reg, var2reg) = rtl_instrs_of_cfg_expr (next_reg, var2reg) rexpr
     in (lrexprs @ rrexprs @ [Rbranch(rcmp, lr, rr, lnext); Rjmp rnext], next_reg, var2reg)
   | Cnop next -> ([], next_reg, var2reg)
+  | Ccall (str, args, next) -> 
+    let reg_list, rexprs, next_reg, var2reg = rtl_instrs_of_cfg_fun_call_args (next_reg, var2reg) args in
+    (rexprs @ [Rcall(None, str, reg_list); Rjmp next], next_reg, var2reg)
 
 let rtl_instrs_of_cfg_fun cfgfunname ({ cfgfunargs; cfgfunbody; cfgentry }: cfg_fun) =
   let (rargs, next_reg, var2reg) =

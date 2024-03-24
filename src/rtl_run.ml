@@ -9,6 +9,7 @@ open Rtl_print
 open Utils
 open Builtins
 open Prog
+open Elang_print
 
 type state = {
   mem: Mem.t;
@@ -77,6 +78,16 @@ let rec exec_rtl_instr oc rp rtlfunname f st (i: rtl_instr) =
       | _ -> Error (Printf.sprintf "Print on undefined register (%s)" (print_reg r))
     end
   | Rlabel n -> OK (None, st)
+  | Rcall (reg_option, fname, args) -> 
+    let args_value = List.map (fun reg -> Hashtbl.find st.regs reg) args in
+    let result, st = (exec_rtl_fun oc rp st fname ((find_function rp fname) >>! identity) args_value) >>! identity in
+    (match reg_option with 
+      | None -> OK (None, st)
+      | Some rd -> (match result with 
+        | None -> Error (Printf.sprintf "Function %s does has not returned any value" fname) 
+        | Some res -> Hashtbl.replace st.regs rd res; OK (None, st)
+        )
+    )
 
 and exec_rtl_instr_at oc rp rtlfunname ({ rtlfunbody;  } as f: rtl_fun) st i =
   match Hashtbl.find_option rtlfunbody i with
