@@ -186,7 +186,7 @@ let rec make_einstr_of_ast (cfun: string) (typ_var: (string, typ) Hashtbl.t) (ty
         )  
       )
       (* let eexpr = error_fail (make_eexpr_of_ast typ_var typ_fun expr) identity in OK(Ireturn eexpr) *)
-    | Node(t, (Node(Tvar, (StringLeaf id)::typ))::s) when t = Tassign ->
+    | Node(t, (Node(Tassignvar, [Node(Tvar, (StringLeaf id)::typ)]))::s) when t = Tassign ->
       let get_type (potential_type: typ option) : typ res =
         option_to_res_bind potential_type
         (Format.sprintf "Undeclared variable %s" id)

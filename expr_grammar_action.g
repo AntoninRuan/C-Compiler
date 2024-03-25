@@ -63,14 +63,14 @@ REST_PARAMS -> SYM_COMMA LPARAMS REST_PARAMS { $2::$3 }
 
 LPARAMS -> TYPE IDENTIFIER { Node(Targ, [ Node(Tvar, [$2; $1]) ]) }
 
-ELSE -> SYM_SEMICOLON { Node(Tblock, []) }
-ELSE -> SYM_ELSE INSTR { $2 }
+ELSE -> { Node(Tblock, []) }
+ELSE -> SYM_ELSE SYM_LBRACE INSTRS SYM_RBRACE { Node(Tblock, $3) }
 
 INSTRS -> { [] }
 INSTRS -> INSTR INSTRS { $1::$2 }
 
 INSTR -> SYM_LBRACE INSTRS SYM_RBRACE { Node(Tblock, $2) }
-INSTR -> SYM_IF SYM_LPARENTHESIS EXPR SYM_RPARENTHESIS INSTR ELSE { Node(Tif, [$3] @ [$5] @ [$6]) }
+INSTR -> SYM_IF SYM_LPARENTHESIS EXPR SYM_RPARENTHESIS SYM_LBRACE INSTRS SYM_RBRACE ELSE { Node(Tif, [$3] @ [Node(Tblock, $6)] @ [$8]) }
 INSTR -> SYM_WHILE SYM_LPARENTHESIS EXPR SYM_RPARENTHESIS INSTR { Node(Twhile, [$3; $5]) }
 INSTR -> SYM_RETURN EXPR SYM_SEMICOLON { Node(Treturn, [$2]) }
 INSTR -> IDENTIFIER ASSIGN_OR_FUN_CALL SYM_SEMICOLON { $2 $1 }
@@ -89,7 +89,7 @@ PTR_OPERATION -> {fun x -> x}
 PTR_OPERATION -> DEREFS { fun x -> $1 x }
 PTR_OPERATION -> REFS { fun x -> $1 x }
 
-ASSIGN_OR_FUN_CALL -> ASSIGN { fun x -> Node(Tassign, [Node(Tvar, [x])] @ $1) }
+ASSIGN_OR_FUN_CALL -> ASSIGN { fun x -> Node(Tassign, [Node(Tassignvar, [Node(Tvar, [x])])] @ $1) }
 ASSIGN_OR_FUN_CALL -> FUN_CALL { $1 }
 
 DECLARATION -> { [] }
