@@ -1,4 +1,5 @@
 open Batteries
+open Prog
 
 (* Les AST sont des arbres, du type [tree], étiquetés par des [tag].
 
@@ -23,24 +24,30 @@ open Batteries
 *)
 
 type tag = Tassign | Tif | Twhile | Tblock | Treturn | Tprint
-         | Tint | Tvar
-         | Tadd | Tmul | Tdiv | Tmod | Txor | Tsub
-         | Tclt | Tcgt | Tcle | Tcge | Tceq | Tne
-         | Tneg
-         | Tlistglobdef
-         | Tfundef | Tfunname | Tfunargs | Tfunbody | Tfuncall | Targs
-         | Tassignvar
-         | Targ
+        | Ttype
+        | Tlitteral | Tvar
+        | Tadd | Tmul | Tdiv | Tmod | Txor | Tsub
+        | Tclt | Tcgt | Tcle | Tcge | Tceq | Tne
+        | Tneg
+        | Tlistglobdef
+        | Tfundef | Tfunname | Tfunargs | Tfunbody | Tfuncall | Targs
+        | Tassignvar
+        | Targ
 
 type tree = | Node of tag * tree list
             | StringLeaf of string
             | IntLeaf of int
             | NullLeaf
             | CharLeaf of char
+            | TypeLeaf of typ
 
 let string_of_stringleaf = function
   | StringLeaf s -> s
   | _ -> failwith "string_of_stringleaf called on non-stringleaf nodes."
+
+let typ_of_typeleaf = function 
+  | TypeLeaf t -> t
+  | _ -> failwith "typ_of_typeleaf called on non-typeleaf nodes."
 
 type astfun = (string list * tree)
 type ast = (string * astfun) list
@@ -52,7 +59,8 @@ let string_of_tag = function
   | Tblock -> "Tblock"
   | Treturn -> "Treturn"
   | Tprint -> "Tprint"
-  | Tint -> "Tint"
+  | Ttype -> "Ttype"
+  | Tlitteral -> "Tlitteral"
   | Tvar -> "Tvar"
   | Tadd -> "Tadd"
   | Tmul -> "Tmul"
@@ -103,6 +111,8 @@ let rec draw_ast a next =
     (next, next+1, [         Format.sprintf "n%d [label=\"null\"]\n" next])
   | CharLeaf i ->
     (next, next+1, [         Format.sprintf "n%d [label=\"%c\"]\n" next i])
+  | TypeLeaf t ->
+    (next, next+1, [         Format.sprintf "n%d [label=\"%s\"]\n" next (string_of_type t)])
 
 let draw_ast_tree oc ast =
   let (_, _, s) = draw_ast ast 1 in
@@ -118,3 +128,4 @@ let rec string_of_ast a =
   | IntLeaf i -> Format.sprintf "%d" i
   | CharLeaf i -> Format.sprintf "%c" i
   | NullLeaf -> "null"
+  | TypeLeaf t  -> Format.sprintf "%s" (string_of_type t)

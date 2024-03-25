@@ -110,7 +110,7 @@ let rtl_instrs_of_cfg_fun cfgfunname ({ cfgfunargs; cfgfunbody; cfgentry }: cfg_
       let (l, next_reg, var2reg) = rtl_instrs_of_cfg_node (next_reg, var2reg) node in
       Hashtbl.replace rtlfunbody n l;
       (next_reg, var2reg)
-    ) cfgfunbody (next_reg, var2reg) in
+    ) cfgfunbody (next_reg, []) in
   {
     rtlfunargs = rargs;
     rtlfunentry = cfgentry;

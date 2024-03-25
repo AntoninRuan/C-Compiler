@@ -26,6 +26,7 @@ let rec dump_eexpr = function
   | Eunop(u, e) -> Printf.sprintf "(%s %s)" (dump_unop u) (dump_eexpr e)
   | Eint i -> Printf.sprintf "%d" i
   | Evar s -> Printf.sprintf "%s" s
+  | Echar c -> Printf.sprintf "%c" c
   | Ecall (str, args) -> Printf.sprintf "%s(%s)" str (String.concat "," (List.map dump_eexpr args))
 
 let indent_size = 2
@@ -39,7 +40,7 @@ let rec dump_einstr_rec indent oc i =
   match i with
   | Iassign(v, e) ->
     print_spaces oc indent;
-    Format.fprintf oc "%s = %s;\n" v (dump_eexpr e)
+    Format.fprintf oc "%s%s;\n" v (match e with | None -> "" | Some e -> Format.sprintf " = %s" (dump_eexpr e))
   | Iif(cond, i1, i2) ->
     print_spaces oc indent;
     Format.fprintf oc "if (%s) %a else %a\n"
@@ -59,6 +60,7 @@ let rec dump_einstr_rec indent oc i =
   | Icall (str, args) -> 
     print_spaces oc indent;
     Format.fprintf oc "%s(%s);\n" str (String.concat "," (List.map dump_eexpr args))
+  | Ibuiltin _ -> ()
 
 let dump_einstr oc i = dump_einstr_rec 0 oc i
 
@@ -66,7 +68,7 @@ let dump_einstr oc i = dump_einstr_rec 0 oc i
 let dump_efun oc funname {funargs; funbody} =
   Format.fprintf oc "%s(%s) %a\n"
     funname
-    (String.concat "," funargs)
+    (String.concat "," (List.map (fun (s, t) -> Format.sprintf "%s %s" s (string_of_type t)) funargs))
     dump_einstr funbody
 
 let dump_eprog oc = dump_prog dump_efun oc

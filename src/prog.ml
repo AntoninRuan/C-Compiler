@@ -67,3 +67,14 @@ let find_function (ep: 'a prog) fname : 'a res =
   match List.assoc_opt fname ep with
   | Some (Gfun f) -> OK f
   | _ -> Error (Format.sprintf "Unknown function %s\n" fname)
+
+type typ = 
+  | Tint
+  | Tchar
+  | Tvoid
+
+let string_of_type t =
+  match t with
+  | Tint -> "int"
+  | Tchar -> "char"
+  | Tvoid -> "void"

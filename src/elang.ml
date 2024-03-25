@@ -9,18 +9,21 @@ type expr =
   | Eunop of unop * expr
   | Eint of int
   | Evar of string
+  | Echar of char
   | Ecall of string * expr list
 
 type instr =
-  | Iassign of string * expr
+  | Iassign of string * expr option
   | Iif of expr * instr * instr
   | Iwhile of expr * instr
   | Iblock of instr list
   | Ireturn of expr
   | Icall of string * expr list
+  | Ibuiltin of string * string list
 
 type efun = {
-  funargs: ( string ) list;
+  funreturntype : typ;
+  funargs: ( string * typ ) list;
   funbody: instr;
 }
 

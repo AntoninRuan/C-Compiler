@@ -2,6 +2,7 @@ open Elang
 open Batteries
 open Prog
 open Utils
+open Builtins
 
 let binop_bool_to_int f x y = if f x y then 1 else 0
 
@@ -29,12 +30,20 @@ let eval_unop (u: unop) : int -> int =
 
 (* [eval_eexpr st e] évalue l'expression [e] dans l'état [st]. Renvoie une
    erreur si besoin. *)
-let rec eval_eexpr oc (st: int state) (prog: eprog) (e : expr) : (int * int state) res =
+let rec eval_eexpr oc (st: (int option) state) (prog: eprog) (e : expr) : (int * (int option) state) res =
    match e with 
-   | Ebinop (op, x, y) -> let x, st = (eval_eexpr oc st prog x) >>! identity in let y, st = (eval_eexpr oc st prog y) >>! identity in OK ((eval_binop op) x y, st)
+   | Ebinop (op, x, y) -> 
+      let x, st = (eval_eexpr oc st prog x) >>! identity in 
+      let y, st = (eval_eexpr oc st prog y) >>! identity in 
+      OK ((eval_binop op) x y, st)
    | Eunop (op, x) -> let x, st = (eval_eexpr oc st prog x) >>! identity in OK ((eval_unop op) x, st)
+   | Echar c -> OK (int_of_char c, st)
    | Eint x -> OK(x, st)
-   | Evar str -> option_to_res_bind (Hashtbl.find_option st.env str) (Printf.sprintf "Variable %s not declared" str) (fun a -> OK(a, st))
+   | Evar str -> option_to_res_bind (Hashtbl.find_option st.env str) 
+      (Printf.sprintf "Variable %s not declared" str) 
+      (fun a -> match a with 
+         | None -> Error (Printf.sprintf "Variable %s not initialized" str) 
+         | Some x -> OK(x, st))
    | Ecall (str, args) -> let args_values, st = eval_args oc st prog args in 
       let result, st = (eval_efun oc st prog ((find_function prog str) >>! identity) str args_values) >>! identity in 
       (match result with None -> Error (Printf.sprintf "Function %s does has not returned any value" str) | Some value -> OK(value, st))
@@ -51,14 +60,21 @@ let rec eval_eexpr oc (st: int state) (prog: eprog) (e : expr) : (int * int stat
    lieu et que l'exécution doit continuer.
 
    - [st'] est l'état mis à jour. *)
-and eval_einstr oc (st: int state) (prog: eprog) (ins: instr) :
-  (int option * int state) res =
+and eval_einstr oc (st: (int option) state) (prog: eprog) (ins: instr) :
+  (int option * (int option) state) res =
    match ins with
-   | Iassign (str, exp) -> let result, st = (eval_eexpr oc st prog exp) >>! identity in Hashtbl.replace st.env str result; OK (None, st)
+   | Iassign (str, exp) -> 
+      (match exp with 
+      | None -> Hashtbl.replace st.env str None; OK(None, st)
+      | Some expr -> (eval_eexpr oc st prog expr) >>= (fun (x, st) -> 
+         Hashtbl.replace st.env str (Some x); OK (None, st)
+      )
+      )
+      (* let result, st = (eval_eexpr oc st prog exp) >>! identity in Hashtbl.replace st.env str result; OK (None, st) *)
    | Iif (cnd, if_instr, else_instr) -> let cmp_res, st = ((eval_eexpr oc st prog cnd) >>! identity) in if cmp_res = 1 then (eval_einstr oc st prog if_instr) else eval_einstr oc st prog else_instr
-   | Iwhile (cnd, instr) -> let res = ref (None, st)  and cont = ref true in 
-      while (let cmp_res, st = ((eval_eexpr oc st prog cnd) >>! identity) in res := (fst !res, st);cmp_res = 1) && !cont do 
-         res := (eval_einstr oc st prog instr) >>! identity; 
+   | Iwhile (cnd, instr) -> let res = ref (None, st) and cont = ref true in 
+      while (let cmp_res, st = ((eval_eexpr oc (snd !res) prog cnd) >>! identity) in res := (fst !res, st);cmp_res = 1) && !cont do 
+         res := (eval_einstr oc (snd !res) prog instr) >>! identity; 
          (match !res with
          | (Some v, _) -> cont := false; ()
          | (None, _) -> cont := true; ()
@@ -72,8 +88,18 @@ and eval_einstr oc (st: int state) (prog: eprog) (ins: instr) :
    | Ireturn expr -> let value, st = (eval_eexpr oc st prog expr) >>! identity in OK (Some value, st)
    | Icall (str, args) -> let args_values, st = eval_args oc st prog args in 
       let result, st = (eval_efun oc st prog ((find_function prog str) >>! identity) str args_values) >>! identity in OK (None, st)
+   | Ibuiltin (str, vargs) -> 
+      (do_builtin oc st.mem str (List.map (fun elt -> 
+         let res = option_to_res_bind (Hashtbl.find st.env elt) 
+         (Format.sprintf "Variable %s not initialized" elt)
+         (fun x -> OK x) in 
+         res >>! identity
+      ) vargs)) >>= (fun x ->
+         OK(x, st)
+      )
+      
 
-and eval_args oc (st: int state) (prog: eprog) (args: expr list) = List.fold_left (
+and eval_args oc (st: (int option) state) (prog: eprog) (args: expr list) = List.fold_left (
    fun (partial_args, st) elt -> let res, st = (eval_eexpr oc st prog elt) >>! identity in (partial_args @ [res], st)
    ) ([], st) args 
 
@@ -82,17 +108,17 @@ and eval_args oc (st: int state) (prog: eprog) (args: expr list) = List.fold_lef
 
    Cette fonction renvoie un couple (ret, st') avec la même signification que
    pour [eval_einstr]. *)
-and eval_efun oc (st: int state) (prog: eprog) ({ funargs; funbody}: efun)
+and eval_efun oc (st: (int option) state) (prog: eprog) ({ funargs; funbody}: efun)
     (fname: string) (vargs: int list)
-  : (int option * int state) res =
+  : (int option * (int option) state) res =
   (* L'environnement d'une fonction (mapping des variables locales vers leurs
      valeurs) est local et un appel de fonction ne devrait pas modifier les
      variables de l'appelant. Donc, on sauvegarde l'environnement de l'appelant
      dans [env_save], on appelle la fonction dans un environnement propre (Avec
      seulement ses arguments), puis on restore l'environnement de l'appelant. *)
   let env_save = Hashtbl.copy st.env in
-  let env = Hashtbl.create 17 in
-  match List.iter2 (fun a v -> Hashtbl.replace env a v) funargs vargs with
+  let (env: (string, int option) Hashtbl.t) = Hashtbl.create 17 in
+  match List.iter2 (fun (arg_name, _) v -> Hashtbl.replace env arg_name (Some v)) funargs vargs with
   | () ->
     eval_einstr oc { st with env } prog funbody >>= fun (v, st') ->
     OK (v, { st' with env = env_save })
@@ -120,11 +146,12 @@ and eval_efun oc (st: int state) (prog: eprog) ({ funargs; funbody}: efun)
    *)
 let eval_eprog oc (ep: eprog) (memsize: int) (params: int list)
   : int option res =
-  let st = init_state memsize in
+  let (st: (int option) state) = init_state memsize in
+  let ep = ("print", Gfun({funreturntype = Tvoid; funargs = [("x", Tint)]; funbody = Ibuiltin("print", ["x"])}))::ep in
   find_function ep "main" >>= fun f ->
   (* ne garde que le nombre nécessaire de paramètres pour la fonction "main". *)
   let n = List.length f.funargs in
   let params = take n params in
-  List.iter2 (fun name value -> Hashtbl.replace st.env name value) f.funargs params;
+  List.iter2 (fun (name, _) value -> Hashtbl.replace st.env name (Some value)) f.funargs params;
   eval_efun oc st ep f "main" params >>= fun (v, _) ->
   OK v

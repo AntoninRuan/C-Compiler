@@ -18,7 +18,7 @@ type cfg_node =
   | Ccall of string * expr list * int
 
 type cfg_fun = {
-  cfgfunargs: string list;
+  cfgfunargs: (string * typ) list;
   cfgfunbody: (int, cfg_node) Hashtbl.t;
   cfgentry: int;
 }

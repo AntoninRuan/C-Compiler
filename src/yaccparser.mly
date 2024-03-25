@@ -87,7 +87,7 @@
         | expr SYM_LEQ expr { Node (Tcle, [$1; $3]) }
         | expr SYM_GEQ expr { Node (Tcge, [$1; $3]) }
         | SYM_MINUS expr %prec UMINUS { Node (Tneg, [$2])}
-        | integer { Node(Tint, [$1])}
+        | integer { Node(Tlitteral, [$1])}
         | identifier { $1 }
         | SYM_LPARENTHESIS expr SYM_RPARENTHESIS { $2 }
       ;

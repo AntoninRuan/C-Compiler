@@ -23,6 +23,7 @@ let rec cfg_expr_of_eexpr (e: Elang.expr) : expr res =
     cfg_expr_of_eexpr e >>= fun ee ->
     OK (Eunop (u, ee))
   | Elang.Eint i -> OK (Eint i)
+  | Elang.Echar c -> Error ""
   | Elang.Evar v ->
     OK (Evar v)
   | Elang.Ecall (str, args) -> OK (Ecall (str, List.map (fun elt -> (cfg_expr_of_eexpr elt) >>! identity) args))
@@ -45,10 +46,13 @@ let rec cfg_expr_of_eexpr (e: Elang.expr) : expr res =
 let rec cfg_node_of_einstr (next: int) (cfg : (int, cfg_node) Hashtbl.t)
     (succ: int) (i: instr) : (int * int) res =
   match i with
-  | Elang.Iassign (v, e) ->
-    cfg_expr_of_eexpr e >>= fun e ->
+  | Elang.Iassign (v, e) -> (match e with
+    | None -> Error ""
+    | Some expr -> Error ""
+  )
+    (* cfg_expr_of_eexpr e >>= fun e ->
     Hashtbl.replace cfg next (Cassign(v,e,succ));
-    OK (next, next + 1)
+    OK (next, next + 1) *)
   | Elang.Iif (c, ithen, ielse) ->
     cfg_expr_of_eexpr c >>= fun c ->
     cfg_node_of_einstr next cfg succ ithen >>= fun (nthen, next) ->
@@ -70,6 +74,7 @@ let rec cfg_node_of_einstr (next: int) (cfg : (int, cfg_node) Hashtbl.t)
   | Elang.Icall (str, args) -> 
     Hashtbl.replace cfg next (Ccall(str, List.map (fun elt -> (cfg_expr_of_eexpr elt) >>! identity) args, succ));
     OK (next, next + 1)
+  | Elang.Ibuiltin _ -> Error "There should not be any builtin"
 
 (* Some nodes may be unreachable after the CFG is entirely generated. The
    [reachable_nodes n cfg] constructs the set of node identifiers that are

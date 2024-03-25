@@ -58,7 +58,7 @@ and eval_cfgfun oc st prog cfgfunname { cfgfunargs;
                                       cfgfunbody;
                                       cfgentry} (vargs: int list) =
   let st' = { st with env = Hashtbl.create 17 } in
-  match List.iter2 (fun a v -> Hashtbl.replace st'.env a v) cfgfunargs vargs with
+  match List.iter2 (fun (a, _) v -> Hashtbl.replace st'.env a v) cfgfunargs vargs with
   | () -> eval_cfginstr oc st' cfgfunbody prog cfgentry >>= fun (v, st') ->
     OK (Some v, {st' with env = st.env})
   | exception Invalid_argument _ ->
