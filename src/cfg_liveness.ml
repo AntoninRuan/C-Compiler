@@ -24,7 +24,8 @@ let live_after_node cfg n (lives: (int, string Set.t) Hashtbl.t) : string Set.t 
    vivantes après ce nœud. *)
 let live_cfg_node (node: cfg_node) (live_after: string Set.t) =
    let use, def = (match node with
-   | Cassign (var, expr, next) -> (vars_in_expr expr, Set.singleton var)
+   | Cassign (var, None, next) -> (Set.empty, Set.singleton var)
+   | Cassign (var, Some expr, next) -> (vars_in_expr expr, Set.singleton var)
    | Creturn expr -> (vars_in_expr expr, Set.empty)
    | Ccmp (expr, lnext, rnext) -> (vars_in_expr expr, Set.empty)
    | Cnop int -> (Set.empty, Set.empty)

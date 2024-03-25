@@ -11,7 +11,7 @@ type expr =
   | Ecall of string * expr list
 
 type cfg_node =
-  | Cassign of string * expr * int
+  | Cassign of string * (expr option) * int
   | Creturn of expr
   | Ccmp of expr * int * int
   | Cnop of int
@@ -67,7 +67,8 @@ let rec size_expr (e: expr) : int =
 
 let size_instr (i: cfg_node) : int =
   match (i : cfg_node) with
-  | Cassign (_, e, _) -> 1 + size_expr e
+  | Cassign (_, None, _) -> 1
+  | Cassign (_, Some e, _) -> 1 + size_expr e
   | Creturn e -> 1 + (size_expr e)
   | Ccmp (e, _, _) -> 1 + size_expr e
   | Cnop _ -> 1

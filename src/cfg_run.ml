@@ -7,7 +7,7 @@ open Cfg
 open Utils
 open Builtins
 
-let rec eval_cfgexpr oc st (prog: cfg_fun prog) (e: expr) : (int * int state) res =
+let rec eval_cfgexpr oc st (prog: cfg_fun prog) (e: expr) : (int * (int option) state) res =
   match e with
   | Ebinop(b, e1, e2) ->
     eval_cfgexpr oc st prog e1 >>= fun (v1, st) ->
@@ -21,28 +21,31 @@ let rec eval_cfgexpr oc st (prog: cfg_fun prog) (e: expr) : (int * int state) re
   | Eint i -> OK (i, st)
   | Evar s ->
     begin match Hashtbl.find_option st.env s with
-      | Some v -> OK (v, st)
-      | None -> Error (Printf.sprintf "Unknown variable %s\n" s)
+      | Some (Some v) -> OK (v, st)
+      | _ -> Error (Printf.sprintf "Unknown variable %s\n" s)
     end
   | Ecall(str, args) -> let args, st = eval_args oc st prog args in 
     let result, st = (eval_cfgfun oc st prog str ((find_function prog str) >>! identity) args) >>! identity in 
     (match result with | None -> Error (Printf.sprintf "Function %s does has not returned any value" str) | Some value -> OK (value, st))
 
-and eval_args oc (st: int state) prog args: (int list * int state) = 
+and eval_args oc (st: (int option) state) prog args: (int list * (int option) state) = 
   List.fold_left (
     fun (partial_args, st) elt -> let res, st = (eval_cfgexpr oc st prog elt) >>! identity in (partial_args @ [res], st)
   ) ([], st) args
 
-and eval_cfginstr oc (st: int state) ht (prog: cfg_fun prog) (n: int): (int * int state) res =
+and eval_cfginstr oc (st: (int option) state) ht (prog: cfg_fun prog) (n: int): (int * (int option) state) res =
   match Hashtbl.find_option ht n with
   | None -> Error (Printf.sprintf "Invalid node identifier\n")
   | Some node ->
     match node with
     | Cnop succ ->
       eval_cfginstr oc st ht prog succ
-    | Cassign(v, e, succ) ->
+    | Cassign(v, None, succ) ->
+      Hashtbl.replace st.env v None;
+      eval_cfginstr oc st ht prog succ
+    | Cassign(v, Some e, succ) ->
       eval_cfgexpr oc st prog e >>= fun (i, st) ->
-      Hashtbl.replace st.env v i;
+      Hashtbl.replace st.env v (Some i);
       eval_cfginstr oc st ht prog succ
     | Ccmp(cond, i1, i2) ->
       eval_cfgexpr oc st prog cond >>= fun (i, st) ->
@@ -58,7 +61,7 @@ and eval_cfgfun oc st prog cfgfunname { cfgfunargs;
                                       cfgfunbody;
                                       cfgentry} (vargs: int list) =
   let st' = { st with env = Hashtbl.create 17 } in
-  match List.iter2 (fun (a, _) v -> Hashtbl.replace st'.env a v) cfgfunargs vargs with
+  match List.iter2 (fun (a, _) v -> Hashtbl.replace st'.env a (Some v)) cfgfunargs vargs with
   | () -> eval_cfginstr oc st' cfgfunbody prog cfgentry >>= fun (v, st') ->
     OK (Some v, {st' with env = st.env})
   | exception Invalid_argument _ ->

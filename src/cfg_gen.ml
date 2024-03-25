@@ -23,7 +23,7 @@ let rec cfg_expr_of_eexpr (e: Elang.expr) : expr res =
     cfg_expr_of_eexpr e >>= fun ee ->
     OK (Eunop (u, ee))
   | Elang.Eint i -> OK (Eint i)
-  | Elang.Echar c -> Error ""
+  | Elang.Echar c -> OK (Eint (int_of_char c))
   | Elang.Evar v ->
     OK (Evar v)
   | Elang.Ecall (str, args) -> OK (Ecall (str, List.map (fun elt -> (cfg_expr_of_eexpr elt) >>! identity) args))
@@ -47,8 +47,8 @@ let rec cfg_node_of_einstr (next: int) (cfg : (int, cfg_node) Hashtbl.t)
     (succ: int) (i: instr) : (int * int) res =
   match i with
   | Elang.Iassign (v, e) -> (match e with
-    | None -> Error ""
-    | Some expr -> Error ""
+    | None -> Hashtbl.replace cfg next (Cassign(v, None, succ)); OK (next, next + 1)
+    | Some expr -> cfg_expr_of_eexpr expr >>= (fun e -> Hashtbl.replace cfg next (Cassign(v, Some e, succ)); OK (next, next + 1))
   )
     (* cfg_expr_of_eexpr e >>= fun e ->
     Hashtbl.replace cfg next (Cassign(v,e,succ));

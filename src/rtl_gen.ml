@@ -27,7 +27,7 @@ open Options
    - [var2reg] est la nouvelle association nom de variable/registre.
 
 *)
-let find_var (next_reg, var2reg) v =
+let find_var (next_reg, (var2reg: (string * reg) list)) v =
   match List.assoc_opt v var2reg with
     | Some r -> (r, next_reg, var2reg)
     | None -> (next_reg, next_reg + 1, assoc_set var2reg v next_reg)
@@ -83,7 +83,9 @@ let rtl_cmp_of_cfg_expr (e: expr) =
 
 let rtl_instrs_of_cfg_node ((next_reg:int), (var2reg: (string*int) list)) (c: cfg_node) =
   match c with
-  | Cassign (var, expr, next) -> let (rd, next_reg, var2reg) = find_var (next_reg, var2reg) var
+  | Cassign (var, None, next) -> let (rd, next_reg, var2reg) = find_var (next_reg, var2reg) var in
+    ([Rjmp next], next_reg, var2reg)
+  | Cassign (var, Some expr, next) -> let (rd, next_reg, var2reg) = find_var (next_reg, var2reg) var
     in let (rs, rexprs, next_reg, var2reg) = rtl_instrs_of_cfg_expr (next_reg, var2reg) expr
     in (rexprs @ [Rmov(rd, rs); Rjmp next], next_reg, var2reg)
   | Creturn expr -> let (r, rexprs, next_reg, var2reg) = rtl_instrs_of_cfg_expr (next_reg, var2reg) expr 
@@ -103,14 +105,14 @@ let rtl_instrs_of_cfg_fun cfgfunname ({ cfgfunargs; cfgfunbody; cfgentry }: cfg_
         let (r, next_reg, var2reg) = find_var (next_reg, var2reg) a in
         (rargs @ [r], next_reg, var2reg)
       )
-      ([], 0, []) cfgfunargs
+      ([], 0, []) (List.map (fun (var, _) -> var) cfgfunargs)
   in
   let rtlfunbody = Hashtbl.create 17 in
   let (next_reg, var2reg) = Hashtbl.fold (fun n node (next_reg, var2reg)->
       let (l, next_reg, var2reg) = rtl_instrs_of_cfg_node (next_reg, var2reg) node in
       Hashtbl.replace rtlfunbody n l;
       (next_reg, var2reg)
-    ) cfgfunbody (next_reg, []) in
+    ) cfgfunbody (next_reg, var2reg) in
   {
     rtlfunargs = rargs;
     rtlfunentry = cfgentry;

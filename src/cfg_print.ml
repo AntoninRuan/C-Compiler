@@ -28,7 +28,8 @@ let dump_arrows oc fname n (node: cfg_node) =
 
 let dump_cfg_node oc (node: cfg_node) =
   match node with
-  | Cassign (v, e, _) -> Format.fprintf oc "%s = %s" v (dump_cfgexpr e)
+  | Cassign (v, None, _ ) -> Format.fprintf oc "declare %s" v
+  | Cassign (v, Some e, _) -> Format.fprintf oc "%s = %s" v (dump_cfgexpr e)
   | Creturn e -> Format.fprintf oc "return %s" (dump_cfgexpr e)
   | Ccmp (e, _, _) -> Format.fprintf oc "%s" (dump_cfgexpr e)
   | Cnop _ -> Format.fprintf oc "nop"
