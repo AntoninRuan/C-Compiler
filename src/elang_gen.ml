@@ -98,7 +98,7 @@ let rec make_eexpr_of_ast (typ_var: (string, typ) Hashtbl.t) (typ_fun: (string, 
       in
       fun_sign >>= (fun (args_t, ret_t) -> 
         let exprs_t = List.map(fun elt -> (type_expr typ_var typ_fun elt) >>! identity) args_list in
-        if (List.equal (=) args_t exprs_t) then
+        if (List.equal (fun l r -> fst (are_compatible l r)) args_t exprs_t) then
           let retexpr = Ecall(s, args_list) in
           (type_expr typ_var typ_fun retexpr) >>= (fun typ -> 
             if typ = Tvoid then
@@ -228,7 +228,7 @@ let rec make_einstr_of_ast (cfun: string) (typ_var: (string, typ) Hashtbl.t) (ty
       in
       fun_sig >>= (fun (args_t, ret_t) ->
         let exprs_t = List.map (fun elt -> (type_expr typ_var typ_fun elt) >>! identity) args_list in
-        if (List.equal (=) args_t exprs_t) then 
+        if (List.equal (fun t1 t2 -> fst (are_compatible t1 t2)) args_t exprs_t) then 
           OK (Icall(s, args_list)) 
         else 
           Error (Format.sprintf "Function call of %s does not fit function signature" s)
