@@ -221,6 +221,7 @@ let written_rtl_regs_instr (i: rtl_instr) =
   | Rlabel _
   | Rbranch (_, _, _, _)
   | Rjmp _ -> Set.empty
+  | Rcall (reg_option, _, _) -> match reg_option with None -> Set.empty | Some rd -> Set.singleton rd
 
 let read_rtl_regs_instr (i: rtl_instr) =
   match i with
@@ -235,6 +236,8 @@ let read_rtl_regs_instr (i: rtl_instr) =
   | Rlabel _
   | Rconst (_, _)
   | Rjmp _ -> Set.empty
+
+  | Rcall (_, _, args) -> Set.of_list args
 
 let read_rtl_regs (l: rtl_instr list) =
   List.fold_left (fun acc i -> Set.union acc (read_rtl_regs_instr i))
@@ -323,6 +326,20 @@ let ltl_instrs_of_linear_instr fname live_out allocation
     load_loc reg_tmp1 allocation r >>= fun (l,r) ->
     OK (l @ [LMov (reg_ret, r) ; LJmp epilogue_label])
   | Rlabel l -> OK [LLabel (Format.sprintf "%s_%d" fname l)]
+  | Rcall(rd, callee_fname, rargs) -> let to_save = Set.to_list ((caller_save live_out allocation rargs) >>! identity) in
+      let save_regs_instructions, arg_saved, ofs = save_caller_save to_save (-(numspilled+1)) in
+      let save_instrs = save_regs_instructions @ [LAddi(reg_sp, reg_sp, ofs * Archi.wordsize ())] in
+      let param_passing_instrs, npush = (pass_parameters rargs allocation arg_saved) >>! identity in
+      let call_instrs = [LCall(callee_fname)] in
+      let depile_instrs = [LAddi(reg_sp, reg_sp, npush)] in
+      let get_res_instrs, restore_instrs = (match rd with 
+        | None -> [], restore_caller_save arg_saved 
+        | Some rd -> let result_loc = Hashtbl.find allocation rd in (match result_loc with
+          | Stk ofs -> [LStore(reg_fp, ofs, reg_a0, archi_mas ())], restore_caller_save arg_saved
+          | Reg rd -> [LMov(rd, reg_a0)], restore_caller_save (List.remove_assoc rd arg_saved)
+        )
+      ) in
+      OK (save_instrs @ param_passing_instrs @ call_instrs @ depile_instrs @ get_res_instrs @ restore_instrs)
   in
   res >>= fun l ->
   OK (LComment (Format.asprintf "#<span style=\"background: pink;\"><b>Linear instr</b>: %a #</span>" (Rtl_print.dump_rtl_instr fname (None, None) ~endl:"") ins)::l)

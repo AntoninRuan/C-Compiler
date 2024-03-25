@@ -16,6 +16,7 @@ let gen_live (i: rtl_instr) =
   | Rmov (_, rs) -> Set.singleton rs
   | Rret r -> Set.singleton r
   | Rlabel _ -> Set.empty
+  | Rcall (_, _, args) -> Set.of_list args
 
 let kill_live (i: rtl_instr) =
   match i with
@@ -28,6 +29,7 @@ let kill_live (i: rtl_instr) =
   | Rret _
   | Rjmp _
   | Rlabel _ -> Set.empty
+  | Rcall(rd, _ , _) -> match rd with None -> Set.empty | Some rd -> Set.singleton rd
 
 let linear_succs (ins: rtl_instr) i labels =
   match ins with

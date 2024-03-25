@@ -60,6 +60,16 @@ let rec exec_linear_instr oc lp fname f st (i: rtl_instr) =
       | _ -> Error (Printf.sprintf "Ret on undefined register (%s)" (print_reg r))
     end
   | Rlabel n -> OK (None, st)
+  | Rcall(rd, fname, args) -> 
+    let args_value = List.map (fun reg -> Hashtbl.find st.regs reg) args in
+    let result, st = (exec_linear_fun oc lp st fname ((find_function lp fname) >>! identity) args_value) >>! identity in
+    (match rd with 
+      | None -> OK (None, st)
+      | Some rd -> (match result with 
+        | None -> Error (Printf.sprintf "Function %s does has not returned any value" fname) 
+        | Some res -> Hashtbl.replace st.regs rd res; OK (None, st)
+        )
+    )
 
 and exec_linear_instr_at oc lp fname ({  linearfunbody;  } as f) st i =
   let l = List.drop_while (fun x -> x <> Rlabel i) linearfunbody in
