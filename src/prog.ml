@@ -72,9 +72,11 @@ type typ =
   | Tint
   | Tchar
   | Tvoid
+  | Tptr of typ
 
-let string_of_type t =
+let rec string_of_type t =
   match t with
   | Tint -> "int"
   | Tchar -> "char"
   | Tvoid -> "void"
+  | Tptr t -> Format.sprintf "%s pointer" (string_of_type t)
