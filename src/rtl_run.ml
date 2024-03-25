@@ -70,13 +70,6 @@ let rec exec_rtl_instr oc rp rtlfunname f st (i: rtl_instr) =
       | Some s -> OK (Some s, st)
       | _ -> Error (Printf.sprintf "Ret on undefined register (%s)" (print_reg r))
     end
-  | Rprint r ->
-    begin match Hashtbl.find_option st.regs r with
-      | Some s ->
-        Format.fprintf oc "%d\n" s;
-        OK (None, st)
-      | _ -> Error (Printf.sprintf "Print on undefined register (%s)" (print_reg r))
-    end
   | Rlabel n -> OK (None, st)
   | Rcall (reg_option, fname, args) -> 
     let args_value = List.map (fun reg -> Hashtbl.find st.regs reg) args in

@@ -70,7 +70,6 @@ and eval_einstr oc (st: int state) (prog: eprog) (ins: instr) :
       (match old_res with | None -> (eval_einstr oc old_st prog elt) | Some value -> acc)
       ) (OK (None, st)) instrs 
    | Ireturn expr -> let value, st = (eval_eexpr oc st prog expr) >>! identity in OK (Some value, st)
-   | Iprint expr -> let value, st = (eval_eexpr oc st prog expr) >>! identity in Format.fprintf oc "%d\n" value; OK (None, st)
    | Icall (str, args) -> let args_values, st = eval_args oc st prog args in 
       let result, st = (eval_efun oc st prog ((find_function prog str) >>! identity) str args_values) >>! identity in OK (None, st)
 

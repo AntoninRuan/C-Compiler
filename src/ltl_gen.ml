@@ -216,7 +216,6 @@ let written_rtl_regs_instr (i: rtl_instr) =
   | Runop (_, rd, _)
   | Rconst (rd, _)
   | Rmov (rd, _) -> Set.singleton rd
-  | Rprint _
   | Rret _
   | Rlabel _
   | Rbranch (_, _, _, _)
@@ -228,7 +227,6 @@ let read_rtl_regs_instr (i: rtl_instr) =
   | Rbinop (_, _, rs1, rs2)
   | Rbranch (_, rs1, rs2, _) -> Set.of_list [rs1; rs2]
 
-  | Rprint rs
   | Runop (_, _, rs)
   | Rmov (_, rs)
   | Rret rs -> Set.singleton rs
@@ -304,24 +302,6 @@ let ltl_instrs_of_linear_instr fname live_out allocation
     load_loc reg_tmp1 allocation rs >>= fun (ls, rs) ->
     store_loc reg_tmp1 allocation rd >>= fun (ld, rd) ->
     OK (ls @ LMov(rd, rs) :: ld)
-  | Rprint r ->
-    let (save_a_regs, arg_saved, ofs) =
-      save_caller_save
-        (range 32)
-        (- (numspilled+1)) in
-    let parameter_passing =
-      match Hashtbl.find_option allocation r with
-      | None -> Error (Format.sprintf "Could not find allocation for register %d\n" r)
-      | Some (Reg rs) -> OK [LMov(reg_a0, rs)]
-      | Some (Stk o) -> OK [LLoad(reg_a0, reg_fp, (Archi.wordsize ()) * o, (archi_mas ()))]
-    in
-    parameter_passing >>= fun parameter_passing ->
-    OK (LComment "Saving a0-a7,t0-t6" :: save_a_regs @
-        LAddi(reg_sp, reg_s0, (Archi.wordsize ()) * (ofs + 1)) ::
-        parameter_passing @
-        LCall "print" ::
-        LComment "Restoring a0-a7,t0-t6" :: restore_caller_save arg_saved)
-
   | Rret r ->
     load_loc reg_tmp1 allocation r >>= fun (l,r) ->
     OK (l @ [LMov (reg_ret, r) ; LJmp epilogue_label])

@@ -13,7 +13,6 @@ type expr =
 type cfg_node =
   | Cassign of string * expr * int
   | Creturn of expr
-  | Cprint of expr * int
   | Ccmp of expr * int * int
   | Cnop of int
   | Ccall of string * expr list * int
@@ -32,7 +31,6 @@ type cprog = cfg_fun prog
 let succs cfg n =
   match Hashtbl.find_option cfg n with
   | None -> Set.empty
-  | Some (Cprint (_, s))
   | Some (Cassign (_, _, s)) -> Set.singleton s
   | Some (Creturn _) -> Set.empty
   | Some (Ccmp (_, s1, s2)) -> Set.of_list [s1;s2]
@@ -46,7 +44,6 @@ let preds cfgfunbody n =
   Hashtbl.fold (fun m m' acc ->
       match m' with
       | Cassign (_, _, s)
-      | Cprint (_, s)
       | Ccall (_, _, s)
       | Cnop s -> if s = n then Set.add m acc else acc
       | Creturn _ -> acc
@@ -72,7 +69,6 @@ let size_instr (i: cfg_node) : int =
   match (i : cfg_node) with
   | Cassign (_, e, _) -> 1 + size_expr e
   | Creturn e -> 1 + (size_expr e)
-  | Cprint (e, _) -> 1 + (size_expr e)
   | Ccmp (e, _, _) -> 1 + size_expr e
   | Cnop _ -> 1
   | Ccall (_, args, _) -> 1 + (List.fold (fun acc elt -> acc + size_expr elt) 0 args)

@@ -50,10 +50,6 @@ and eval_cfginstr oc (st: int state) ht (prog: cfg_fun prog) (n: int): (int * in
     | Creturn(e) ->
       eval_cfgexpr oc st prog e >>= fun (e, st) ->
       OK (e, st)
-    | Cprint(e, succ) ->
-      eval_cfgexpr oc st prog e >>= fun (e, st) ->
-      Format.fprintf oc "%d\n" e;
-      eval_cfginstr oc st ht prog succ
     | Ccall (str, args, succ) -> let args, st = eval_args oc st prog args in
       let _, st = (eval_cfgfun oc st prog str ((find_function prog str) >>! identity) args) >>! identity in
       eval_cfginstr oc st ht prog succ

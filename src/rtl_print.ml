@@ -39,7 +39,6 @@ let dump_rtl_instr name (live_in, live_out) ?(endl="\n") oc (i: rtl_instr) =
     Format.fprintf oc "jmp %s" (print_node s)
   | Rmov (rd, rs) -> Format.fprintf oc "%s <- %s" (print_reg rd) (print_reg rs)
   | Rret r -> Format.fprintf oc "ret %s" (print_reg r)
-  | Rprint r -> Format.fprintf oc "print %s" (print_reg r)
   | Rlabel n -> Format.fprintf oc "%s_%d:" name n
   | Rcall (reg_option, fname, args) -> 
     Format.fprintf oc "%s <- %s(%s)" 

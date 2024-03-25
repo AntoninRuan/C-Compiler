@@ -26,7 +26,6 @@ let live_cfg_node (node: cfg_node) (live_after: string Set.t) =
    let use, def = (match node with
    | Cassign (var, expr, next) -> (vars_in_expr expr, Set.singleton var)
    | Creturn expr -> (vars_in_expr expr, Set.empty)
-   | Cprint (expr, next) -> (vars_in_expr expr, Set.empty)
    | Ccmp (expr, lnext, rnext) -> (vars_in_expr expr, Set.empty)
    | Cnop int -> (Set.empty, Set.empty)
    | Ccall (str, args, next) -> (List.fold_left (fun acc elt -> Set.union acc (vars_in_expr elt)) Set.empty args, Set.empty)

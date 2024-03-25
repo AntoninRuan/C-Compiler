@@ -17,7 +17,6 @@ let dump_list_cfgexpr l =
 let dump_arrows oc fname n (node: cfg_node) =
   match node with
   | Cassign (_, _, succ)
-  | Cprint (_, succ)
   | Ccall (_, _, succ)
   | Cnop succ ->
     Format.fprintf oc "n_%s_%d -> n_%s_%d\n" fname n fname succ
@@ -30,7 +29,6 @@ let dump_arrows oc fname n (node: cfg_node) =
 let dump_cfg_node oc (node: cfg_node) =
   match node with
   | Cassign (v, e, _) -> Format.fprintf oc "%s = %s" v (dump_cfgexpr e)
-  | Cprint (e, _) -> Format.fprintf oc "print %s" (dump_cfgexpr e)
   | Creturn e -> Format.fprintf oc "return %s" (dump_cfgexpr e)
   | Ccmp (e, _, _) -> Format.fprintf oc "%s" (dump_cfgexpr e)
   | Cnop _ -> Format.fprintf oc "nop"

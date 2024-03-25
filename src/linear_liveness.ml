@@ -8,7 +8,6 @@ open Rtl
 let gen_live (i: rtl_instr) =
   match i with
   | Rbinop (b, rd, rs1, rs2) -> Set.of_list [rs1; rs2]
-  | Rprint rs
   | Runop (_, _, rs) -> Set.singleton rs
   | Rconst (_, _) -> Set.empty
   | Rbranch (_, rs1, rs2, _) -> Set.of_list [rs1; rs2]
@@ -25,7 +24,6 @@ let kill_live (i: rtl_instr) =
   | Rconst (rd, _)
   | Rmov (rd,_) -> Set.singleton rd
   | Rbranch (_, _, _, _)
-  | Rprint _
   | Rret _
   | Rjmp _
   | Rlabel _ -> Set.empty

@@ -83,7 +83,6 @@ let rec make_einstr_of_ast (a: tree) : instr res =
       in let icnd = error_fail icnd_res identity and instrs = error_fail instrs identity in
       OK (Iwhile (icnd, instrs))
     | Node(t, [expr]) when t = Treturn -> let eexpr = error_fail (make_eexpr_of_ast expr) identity in OK(Ireturn eexpr)
-    | Node(t, [expr]) when t = Tprint -> let eexpr = error_fail (make_eexpr_of_ast expr) identity in OK(Iprint eexpr)
     | Node(t, [id; expr]) when t = Tassign -> let eid = error_fail (make_eexpr_of_ast id) identity and eexpr = error_fail (make_eexpr_of_ast expr) identity
       in (match eid with 
         | (Evar str) -> OK (Iassign (str, eexpr))

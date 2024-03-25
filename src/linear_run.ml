@@ -47,13 +47,6 @@ let rec exec_linear_instr oc lp fname f st (i: rtl_instr) =
       OK (None, st)
     | _ -> Error (Printf.sprintf "Mov on undefined register (%s)" (print_reg rs))
     end
-  | Rprint r ->
-    begin match Hashtbl.find_option st.regs r with
-      | Some s ->
-        Format.fprintf oc "%d\n" s;
-        OK (None, st)
-      | _ -> Error (Printf.sprintf "Print on undefined register (%s)" (print_reg r))
-    end
   | Rret r ->
     begin match Hashtbl.find_option st.regs r with
       | Some s -> OK (Some s, st)

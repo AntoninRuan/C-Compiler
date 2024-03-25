@@ -17,7 +17,6 @@ type instr =
   | Iwhile of expr * instr
   | Iblock of instr list
   | Ireturn of expr
-  | Iprint of expr
   | Icall of string * expr list
 
 type efun = {
