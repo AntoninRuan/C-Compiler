@@ -94,9 +94,8 @@ let list_regexp : (regexp * (string -> token option)) list =
     (keyword_regexp "!=",   fun _ -> Some (SYM_NOTEQ));
     (char_regexp '<',       fun _ -> Some (SYM_LT));
     (char_regexp '>',       fun _ -> Some (SYM_GT));
-    (keyword_regexp "<=",   fun _ -> Some (SYM_LEQ));
-    (keyword_regexp ">=",   fun _ -> Some (SYM_GEQ));
-    (keyword_regexp "&",     fun _ -> Some (SYM_AMPERSAND));
+    (keyword_regexp "<=",       fun _ -> Some (SYM_LEQ));
+    (keyword_regexp ">=",       fun _ -> Some (SYM_GEQ));
     (Cat(letter_regexp, Star(identifier_material)),       fun s -> Some (SYM_IDENTIFIER s));
     (* end TODO *)
     (Cat(keyword_regexp "//",

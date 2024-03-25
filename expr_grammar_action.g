@@ -3,9 +3,8 @@ tokens SYM_LPARENTHESIS SYM_RPARENTHESIS SYM_LBRACE SYM_RBRACE
 tokens SYM_ASSIGN SYM_SEMICOLON SYM_RETURN SYM_IF SYM_WHILE SYM_ELSE SYM_COMMA
 tokens SYM_EQUALITY SYM_NOTEQ SYM_LT SYM_LEQ SYM_GT SYM_GEQ
 tokens SYM_VOID SYM_INT SYM_CHAR
-tokens SYM_AMPERSAND
 non-terminals S INSTR<tree> INSTRS<tree list> ELSE EXPR FACTOR
-non-terminals TYPE PTRS LPTR DEREFS RDEREF REFS RREF PTR_OPERATION
+non-terminals TYPE
 non-terminals FUN_CALL FUN_CALL_ARGS_LIST REXPRS
 non-terminals ASSIGN DECLARATION ASSIGN_OR_FUN_CALL
 non-terminals LPARAMS REST_PARAMS PARAMS_LIST
@@ -24,7 +23,6 @@ open BatPrintf
 open BatBuffer
 open Batteries
 open Utils
-open Prog
 
 let resolve_associativity term other =
   List.fold_left (fun acc (tag, leaf) -> Node(tag, [acc; leaf])) term other
@@ -42,13 +40,9 @@ CHARACTER -> SYM_CHARACTER { Node(Tlitteral, [CharLeaf($1)]) }
 FUNDEFS -> { [] }
 FUNDEFS -> FUNDEF FUNDEFS { $1::$2 }
 
-TYPE -> SYM_INT PTRS { $2 (Tint) }
-TYPE -> SYM_CHAR PTRS { $2 (Tchar) } 
-TYPE -> SYM_VOID PTRS { $2 (Tvoid) }
-
-PTRS -> { fun x -> Node(Ttype, [TypeLeaf x]) }
-PTRS -> LPTR PTRS { fun x -> $2 ($1 x) }
-LPTR -> SYM_ASTERISK { fun x -> Tptr (x)  }
+TYPE -> SYM_INT { Node(Ttype, [TypeLeaf (Tint)]) }
+TYPE -> SYM_CHAR { Node(Ttype, [TypeLeaf (Tchar)]) } 
+TYPE -> SYM_VOID { Node(Ttype, [TypeLeaf (Tvoid)]) }
 
 FUN_BODY -> SYM_SEMICOLON { [] }
 FUN_BODY -> SYM_LBRACE INSTRS SYM_RBRACE { [Node(Tblock, $2)] }
@@ -63,31 +57,18 @@ REST_PARAMS -> SYM_COMMA LPARAMS REST_PARAMS { $2::$3 }
 
 LPARAMS -> TYPE IDENTIFIER { Node(Targ, [ Node(Tvar, [$2; $1]) ]) }
 
-ELSE -> SYM_SEMICOLON { Node(Tblock, []) }
-ELSE -> SYM_ELSE INSTR { $2 }
+ELSE -> { Node(Tblock, []) }
+ELSE -> SYM_ELSE SYM_LBRACE INSTRS SYM_RBRACE { Node(Tblock, $3) }
 
 INSTRS -> { [] }
 INSTRS -> INSTR INSTRS { $1::$2 }
 
 INSTR -> SYM_LBRACE INSTRS SYM_RBRACE { Node(Tblock, $2) }
-INSTR -> SYM_IF SYM_LPARENTHESIS EXPR SYM_RPARENTHESIS INSTR ELSE { Node(Tif, [$3] @ [$5] @ [$6]) }
+INSTR -> SYM_IF SYM_LPARENTHESIS EXPR SYM_RPARENTHESIS SYM_LBRACE INSTRS SYM_RBRACE ELSE { Node(Tif, [$3] @ [Node(Tblock, $6)] @ [$8]) }
 INSTR -> SYM_WHILE SYM_LPARENTHESIS EXPR SYM_RPARENTHESIS INSTR { Node(Twhile, [$3; $5]) }
 INSTR -> SYM_RETURN EXPR SYM_SEMICOLON { Node(Treturn, [$2]) }
 INSTR -> IDENTIFIER ASSIGN_OR_FUN_CALL SYM_SEMICOLON { $2 $1 }
-INSTR -> DEREFS IDENTIFIER ASSIGN SYM_SEMICOLON { Node(Tassign, [Node(Tassignvar, [$1 (Node(Tvar, [$2]))])] @ $3) }
-INSTR -> TYPE IDENTIFIER DECLARATION SYM_SEMICOLON { Node(Tassign, [Node(Tassignvar, [Node(Tvar, [$2; $1])])] @ $3) }
-
-DEREFS -> SYM_ASTERISK RDEREF { fun x -> Node(Tderef, [$2 x]) }
-RDEREF -> { fun x -> x }
-RDEREF -> SYM_ASTERISK RDEREF {fun x -> Node(Tderef, [$2 x])}
-
-REFS -> SYM_AMPERSAND RREF {fun x -> Node(Tref, [$2 x])}
-RREF -> {fun x -> x}
-RREF -> SYM_AMPERSAND RREF {fun x -> Node(Tref, [$2 x]) } 
-
-PTR_OPERATION -> {fun x -> x}
-PTR_OPERATION -> DEREFS { fun x -> $1 x }
-PTR_OPERATION -> REFS { fun x -> $1 x }
+INSTR -> TYPE IDENTIFIER DECLARATION SYM_SEMICOLON { Node(Tassign, [Node(Tvar, [$2; $1])] @ $3) }
 
 ASSIGN_OR_FUN_CALL -> ASSIGN { fun x -> Node(Tassign, [Node(Tvar, [x])] @ $1) }
 ASSIGN_OR_FUN_CALL -> FUN_CALL { $1 }
@@ -129,7 +110,7 @@ MUL_EXPR -> SYM_MINUS FACTOR { Node(Tneg, [$2]) }
 
 FACTOR -> INTEGER { $1 }
 FACTOR -> CHARACTER { $1 }
-FACTOR -> PTR_OPERATION IDENTIFIER FUN_CALL { $3 ($1 $2) }
+FACTOR -> IDENTIFIER FUN_CALL { $2 $1 }
 FACTOR -> SYM_LPARENTHESIS EXPR SYM_RPARENTHESIS { $2 }
 
 FUN_CALL -> { fun x -> Node(Tvar, [x]) }
