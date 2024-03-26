@@ -3,7 +3,7 @@
 # otherwise, use basic/*.e as a default
 FILES := $(if $(DIR),$(DIR),basic/*.e)
 
-OPTS := $(if $(OPTS), $(OPTS),)
+OPTS := $(if $(OPTS), $(OPTS),-clever-regalloc)
 
 .PHONY: all
 all: ../ecomp
