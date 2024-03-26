@@ -84,14 +84,6 @@ let rec exec_rtl_instr oc rp rtlfunname f st (sp: int) (i: rtl_instr) =
         )  
       ) 
     )
-    (* let result, st = (exec_rtl_fun oc rp st fname ((find_function rp fname) >>! identity) args_value) >>! identity in
-    (match reg_option with 
-      | None -> OK (None, st)
-      | Some rd -> (match result with 
-        | None -> Error (Printf.sprintf "Function %s has not returned any value" fname) 
-        | Some res -> Hashtbl.replace st.regs rd res; OK (None, st)
-        )
-    ) *)
   | Rstk (rd, ofs) -> Hashtbl.replace st.regs rd (sp + ofs); OK (None, st)
   | Rload (rd, rs, sz) -> 
     (match Hashtbl.find_option st.regs rs with
@@ -148,7 +140,7 @@ and exec_rtl_prog oc rp memsize params =
     rtlfunstksz = 0;
     rtlfuninfo = [("x", 0)];
     rtlfunentry = 0;
-    rtlfunbody = (let body = Hashtbl.create 2 in
+    rtlfunbody = (let body = Hashtbl.create 1 in
     Hashtbl.replace body 0 [Rbuiltin("print", [0])];
     body)
   })::rp in

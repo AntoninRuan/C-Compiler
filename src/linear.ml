@@ -8,4 +8,5 @@ type linear_fun = {
   linearfunargs: reg list;
   linearfunbody: rtl_instr list;
   linearfuninfo: (string*reg) list;
+  linearfunstksz: int;
 }
