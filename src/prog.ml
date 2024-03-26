@@ -84,7 +84,7 @@ let rec string_of_type t =
 
 let size_type (t: typ): int res = 
   match t with
-  | Tint -> OK (size_of_mas (archi_mas ()))
+  | Tint -> OK 4
   | Tchar -> OK 1
   | Tvoid -> OK 0
   | Tptr _ -> OK (size_of_mas (archi_mas ()))

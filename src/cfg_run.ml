@@ -36,7 +36,7 @@ let rec eval_cfgexpr oc st (prog: cfg_fun prog) (f: cfg_fun) (sp: int) (e: expr)
     )
     (* let result, st = (eval_cfgfun oc st prog str ((find_function prog str) >>! identity) sp args) >>! identity in 
     (match result with | None -> Error (Printf.sprintf "Function %s does has not returned any value" str) | Some value -> OK (value, st)) *)
-  | Estk ofs -> OK (ofs + sp, st)
+  | Estk ofs -> OK (-ofs + sp, st)
   | Eload (expr, sz) -> 
     eval_cfgexpr oc st prog f sp expr >>= (fun (addr, st) ->
       let mem_read_res = Mem.read_bytes_as_int st.mem addr (sz) in

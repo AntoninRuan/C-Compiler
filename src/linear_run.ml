@@ -74,7 +74,7 @@ let rec exec_linear_instr oc lp fname f st (sp: int) (i: rtl_instr) =
         | Some res -> Hashtbl.replace st.regs rd res; OK (None, st)
         )
     ) *)
-    | Rstk (rd, ofs) -> Hashtbl.replace st.regs rd (sp + ofs); OK (None, st)
+    | Rstk (rd, ofs) -> Hashtbl.replace st.regs rd (sp - ofs); OK (None, st)
     | Rload (rd, rs, sz) -> 
       (match Hashtbl.find_option st.regs rs with
       | Some addr -> 

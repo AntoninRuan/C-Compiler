@@ -73,7 +73,7 @@ let rec eval_eexpr oc (st: (int option) state) (prog: eprog) (f: efun) (sp: int)
          (Format.sprintf "Variable %s not declared" str)
          (fun ofs -> 
             (size_type (Hashtbl.find f.funtypvar str)) >>= (fun size ->
-               Mem.read_bytes_as_int st.mem (sp + ofs) size >>= fun res -> OK (res, st) 
+               Mem.read_bytes_as_int st.mem (sp - ofs) size >>= fun res -> OK (res, st) 
             )  
          )
       ) 
@@ -97,7 +97,7 @@ let rec eval_eexpr oc (st: (int option) state) (prog: eprog) (f: efun) (sp: int)
       (fun x -> OK x)
       in 
       ofs >>= (fun ofs ->
-         OK(sp + ofs, st)  
+         OK(sp - ofs, st)  
       )
    )
    | Eload expr -> (eval_eexpr oc st prog f sp expr) >>= (fun (addr, st) -> 
@@ -133,7 +133,7 @@ and eval_einstr oc (st: (int option) state) (prog: eprog) (f: efun) (sp: int) (i
          if (Hashtbl.mem f.funvarinmem str) then (
             let typ = Hashtbl.find f.funtypvar str 
             in (size_type typ) >>= (fun size ->
-               let res = Mem.write_bytes st.mem (sp + (Hashtbl.find f.funvarinmem str)) (split_bytes (max size (Archi.wordsize ())) x) in
+               let res = Mem.write_bytes st.mem (sp - (Hashtbl.find f.funvarinmem str)) (split_bytes (max size (Archi.wordsize ())) x) in
                res >>= (fun () -> OK(None, st))  
             )
          ) else (

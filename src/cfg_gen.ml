@@ -15,6 +15,12 @@ open Options
    In later versions of this compiler, you will add more things to [Elang.expr]
    but not to [Cfg.expr], hence the distinction.
 *)
+let invert_add_op op =
+  match op with 
+  | Eadd -> Esub
+  | Esub -> Eadd
+  | _ -> op
+
 let rec cfg_expr_of_eexpr (f: efun) (e: Elang.expr) : expr res =
   match e with
   | Elang.Ebinop (b, lhe, rhe) ->

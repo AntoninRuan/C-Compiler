@@ -37,35 +37,35 @@ let make_sp_add v =
    dst] generates instructions so that the value in [src] ends up in [dst],
    where [src] and [dst] can be registers [Reg r] or stack offsets [Stk o].
 *)
-let make_loc_mov src dst =
+let make_loc_mov src dst numlocals =
   match src, dst with
   | Stk osrc , Stk odst ->
     let rtmp = reg_tmp1 in
-    [LLoad(rtmp, reg_fp, (Archi.wordsize ()) * osrc, (archi_mas ()));
-     LStore(reg_fp, (Archi.wordsize ()) * odst, rtmp, (archi_mas ()))]
+    [LLoad(rtmp, reg_fp, numlocals + (Archi.wordsize ()) * osrc, (archi_mas ()));
+     LStore(reg_fp, numlocals + (Archi.wordsize ()) * odst, rtmp, (archi_mas ()))]
   | Stk osrc, Reg rdst ->
-    [LLoad(rdst, reg_fp, (Archi.wordsize ()) * osrc, (archi_mas ()))]
+    [LLoad(rdst, reg_fp, numlocals + (Archi.wordsize ()) * osrc, (archi_mas ()))]
   | Reg rsrc, Stk ofst ->
-    [LStore(reg_fp, (Archi.wordsize ()) * ofst, rsrc, (archi_mas ()))]
+    [LStore(reg_fp, numlocals + (Archi.wordsize ()) * ofst, rsrc, (archi_mas ()))]
   | Reg rsrc, Reg rdst ->
     [LMov(rdst,rsrc)]
 
 (* load_loc tmp allocation r = (l, r'). Loads the equivalent of RTL register r
    in a LTL register r'. tmpis used if necessary. *)
-let load_loc tmp allocation r =
+let load_loc tmp allocation numlocals r =
   match Hashtbl.find_option allocation r with
   | None ->
     Error (Format.sprintf "Unable to allocate RTL register r%d." r)
-  | Some (Stk o) -> OK ([LLoad(tmp, reg_fp, (Archi.wordsize ()) * o, (archi_mas ()))], tmp)
+  | Some (Stk o) -> OK ([LLoad(tmp, reg_fp, numlocals + (Archi.wordsize ()) * o, (archi_mas ()))], tmp)
   | Some (Reg r) -> OK ([], r)
 
 (* store_loc tmp allocation r = (l, r'). I want to write in RTL register r.
    Tells me that I just have to write to LTL register r' and execute l. *)
-let store_loc tmp allocation r =
+let store_loc tmp allocation numlocals r =
   match Hashtbl.find_option allocation r with
   | None ->
     Error (Format.sprintf "Unable to allocate RTL register r%d." r)
-  | Some (Stk o) -> OK ([LStore(reg_fp, (Archi.wordsize ()) * o, tmp, (archi_mas ()))], tmp)
+  | Some (Stk o) -> OK ([LStore(reg_fp, numlocals + (Archi.wordsize ()) * o, tmp, (archi_mas ()))], tmp)
   | Some (Reg r) -> OK ([], r)
 
 (* saves registers in [to_save] on the stack at offsets [fp + 8 * o, fp + 8 * (o
@@ -215,24 +215,32 @@ let written_rtl_regs_instr (i: rtl_instr) =
   | Rbinop (_, rd, _, _)
   | Runop (_, rd, _)
   | Rconst (rd, _)
+  | Rstk (rd, _)
+  | Rload (rd, _, _)
   | Rmov (rd, _) -> Set.singleton rd
   | Rret _
   | Rlabel _
   | Rbranch (_, _, _, _)
+  | Rstore (_, _, _)
+  | Rbuiltin (_, _)
   | Rjmp _ -> Set.empty
   | Rcall (reg_option, _, _) -> match reg_option with None -> Set.empty | Some rd -> Set.singleton rd
 
 let read_rtl_regs_instr (i: rtl_instr) =
   match i with
   | Rbinop (_, _, rs1, rs2)
+  | Rstore (rs1, rs2, _)
   | Rbranch (_, rs1, rs2, _) -> Set.of_list [rs1; rs2]
 
   | Runop (_, _, rs)
   | Rmov (_, rs)
+  | Rload (_, rs, _)
   | Rret rs -> Set.singleton rs
 
   | Rlabel _
   | Rconst (_, _)
+  | Rstk (_, _)
+  | Rbuiltin (_, _)
   | Rjmp _ -> Set.empty
 
   | Rcall (_, _, args) -> Set.of_list args
@@ -266,6 +274,9 @@ let caller_save live_out allocation rargs =
   let l = Set.union live_after_ltl overwritten_args_tosave in
   OK (Set.intersect l (Set.of_list (arg_registers @ reg_tmp)))
 
+let archi_ofs_of_ofs ofs = 
+  ofs / (Archi.wordsize ())
+
 (* This generates LTL instructions for a given Linear/RTL instruction. In most
    cases, the transformation amounts to 'loading' RTL registers in LTL locations
    and emitting the straightforward corresponding LTL instructions. This uses
@@ -278,36 +289,36 @@ let caller_save live_out allocation rargs =
    then we don't need its value to be preserved across function calls.) These
    registers are saved at [fp - 8 * (curstackslot + 1)] *)
 let ltl_instrs_of_linear_instr fname live_out allocation
-    numspilled epilogue_label ins =
+    (numlocals: int) numspilled epilogue_label ins =
   let res =
   match ins with
   | Rbinop (b, rd, rs1, rs2) ->
-    load_loc reg_tmp1 allocation rs1 >>= fun (l1, r1) ->
-    load_loc reg_tmp2 allocation rs2 >>= fun (l2, r2) ->
-    store_loc reg_tmp1 allocation rd >>= fun (ld, rd) ->
+    load_loc reg_tmp1 allocation numlocals rs1 >>= fun (l1, r1) ->
+    load_loc reg_tmp2 allocation numlocals rs2 >>= fun (l2, r2) ->
+    store_loc reg_tmp1 allocation numlocals rd >>= fun (ld, rd) ->
     OK (l1 @ l2 @ LBinop(b, rd, r1, r2) :: ld)
   | Runop (u, rd, rs) ->
-    load_loc reg_tmp1 allocation rs >>= fun (l1,r1) ->
-    store_loc reg_tmp1 allocation rd >>= fun (ld, rd) ->
+    load_loc reg_tmp1 allocation numlocals rs >>= fun (l1,r1) ->
+    store_loc reg_tmp1 allocation numlocals rd >>= fun (ld, rd) ->
     OK (l1 @ LUnop(u, rd, r1) :: ld)
   | Rconst (rd, i) ->
-    store_loc reg_tmp1 allocation rd >>= fun (ld, rd) ->
+    store_loc reg_tmp1 allocation numlocals rd >>= fun (ld, rd) ->
     OK (LConst(rd, i)::ld)
   | Rbranch (cmp, rs1, rs2, s1) ->
-    load_loc reg_tmp1 allocation rs1 >>= fun (l1, r1) ->
-    load_loc reg_tmp2 allocation rs2 >>= fun (l2, r2) ->
+    load_loc reg_tmp1 allocation numlocals rs1 >>= fun (l1, r1) ->
+    load_loc reg_tmp2 allocation numlocals rs2 >>= fun (l2, r2) ->
     OK (l1 @ l2 @ [LBranch(cmp, r1, r2, Format.sprintf "%s_%d" fname s1)])
   | Rjmp s -> OK [LJmp (Format.sprintf "%s_%d" fname s)]
   | Rmov (rd, rs) ->
-    load_loc reg_tmp1 allocation rs >>= fun (ls, rs) ->
-    store_loc reg_tmp1 allocation rd >>= fun (ld, rd) ->
+    load_loc reg_tmp1 allocation numlocals rs >>= fun (ls, rs) ->
+    store_loc reg_tmp1 allocation numlocals rd >>= fun (ld, rd) ->
     OK (ls @ LMov(rd, rs) :: ld)
   | Rret r ->
-    load_loc reg_tmp1 allocation r >>= fun (l,r) ->
+    load_loc reg_tmp1 allocation numlocals r >>= fun (l,r) ->
     OK (l @ [LMov (reg_ret, r) ; LJmp epilogue_label])
   | Rlabel l -> OK [LLabel (Format.sprintf "%s_%d" fname l)]
   | Rcall(rd, callee_fname, rargs) -> let to_save = Set.to_list ((caller_save live_out allocation rargs) >>! identity) in
-      let save_regs_instructions, arg_saved, ofs = save_caller_save to_save (-(numspilled+1)) in
+      let save_regs_instructions, arg_saved, ofs = save_caller_save to_save (-(numlocals + numspilled+1)) in
       let save_instrs = save_regs_instructions @ [LAddi(reg_sp, reg_sp, ofs * Archi.wordsize ())] in
       let param_passing_instrs, npush = (pass_parameters rargs allocation arg_saved) >>! identity in
       let call_instrs = [LCall(callee_fname)] in
@@ -319,7 +330,19 @@ let ltl_instrs_of_linear_instr fname live_out allocation
           | Reg rd -> [LMov(rd, reg_a0)], restore_caller_save (List.remove_assoc rd arg_saved)
         )
       ) in
-      OK (save_instrs @ param_passing_instrs @ call_instrs @ depile_instrs @ get_res_instrs @ restore_instrs)
+      let restore_sp_instrs = [LSubi(reg_sp, reg_sp, ofs * Archi.wordsize())] in
+      OK (save_instrs @ param_passing_instrs @ call_instrs @ depile_instrs @ get_res_instrs @ restore_instrs @ restore_sp_instrs)
+    | Rstk (rd, ofs) -> load_loc reg_tmp1 allocation numlocals rd >>= fun (l1, rd) ->
+      OK (l1 @ [LAddi(rd, reg_fp, - ofs - (Archi.wordsize ()))])
+    | Rload (rd, rs, sz) -> 
+      load_loc reg_tmp1 allocation numlocals rs >>= fun (ls, rs) ->
+      store_loc reg_tmp2 allocation numlocals rd >>= fun (lr, rd) ->
+      OK (ls @ LLoad(rd, rs, 0, archi_mas ()) :: lr)
+    | Rstore (rd, rs, sz) -> 
+      load_loc reg_tmp1 allocation numlocals rs >>= fun (ls, rs) ->
+      load_loc reg_tmp2 allocation numlocals rd >>= fun (ld, rd) ->
+      OK (ls @ ld @ [LStore(rd, 0, rs, archi_mas())])
+    | Rbuiltin (_, _) -> Error "There should not be any Rbuiltin in linear program"
   in
   res >>= fun l ->
   OK (LComment (Format.asprintf "#<span style=\"background: pink;\"><b>Linear instr</b>: %a #</span>" (Rtl_print.dump_rtl_instr fname (None, None) ~endl:"") ins)::l)
@@ -332,6 +355,9 @@ let retrieve_nth_arg n numcalleesave =
   then Reg (n + starting_arg_register)
   else Stk ((numcalleesave + n-thr))
 
+let fun_stk_empl stksz = 
+  (stksz + (Archi.wordsize ()) + 1) / (Archi.wordsize ())
+
 (* This function creates a LTL function out of a Linear function. In addition to
    using machine registers instead of ideal registers, it deals with saving and
    restoring callee-save registers. The function prologue consists of saving
@@ -342,7 +368,7 @@ let retrieve_nth_arg n numcalleesave =
    the value stored in s0 (fp), restore all the callee-save registers and jumps
    back to [ra]. *)
 let ltl_fun_of_linear_fun linprog
-    (({ linearfunargs; linearfunbody; linearfuninfo }): linear_fun) fname
+    (({ linearfunargs; linearfunbody; linearfuninfo; linearfunstksz }): linear_fun) fname
     (live_in,live_out) (allocation, numspilled) =
   List.iteri (fun i pr ->
       Hashtbl.replace allocation pr (retrieve_nth_arg i 0)
@@ -352,11 +378,10 @@ let ltl_fun_of_linear_fun linprog
          (written_ltl_regs fname linearfunbody allocation)) in
   let callee_saved_regs =
     Set.intersect (Set.of_list callee_saved) written_regs in
-  List.iteri (fun i pr ->
+    List.iteri (fun i pr ->
       Hashtbl.replace allocation pr
         (retrieve_nth_arg i (Set.cardinal callee_saved_regs))
     ) linearfunargs;
-
   let max_label =
     List.fold_left (fun acc i ->
         match i with
@@ -364,10 +389,11 @@ let ltl_fun_of_linear_fun linprog
         | _ -> acc)
       0 linearfunbody in
   let epilogue_label = Format.sprintf "%s_%d" fname (max_label + 1) in
+  let numlocals = (fun_stk_empl linearfunstksz) in
   let prologue =
     List.concat (List.map make_push (Set.to_list callee_saved_regs)) @
     LMov (reg_fp, reg_sp) ::
-    make_sp_sub (numspilled * (Archi.wordsize ())) @
+    make_sp_sub ((numlocals + numspilled) * (Archi.wordsize ())) @
     [LComment "end prologue"] in
   let epilogue = LLabel epilogue_label ::
                  LMov(reg_sp, reg_fp) ::
@@ -376,7 +402,7 @@ let ltl_fun_of_linear_fun linprog
                  [LJmpr reg_ra] in
   list_map_resi (fun i ->
       ltl_instrs_of_linear_instr fname (Hashtbl.find_default live_out i Set.empty)
-        allocation numspilled epilogue_label) linearfunbody
+        allocation numlocals numspilled epilogue_label) linearfunbody
   >>= fun l ->
   let instrs = List.concat l 
   in

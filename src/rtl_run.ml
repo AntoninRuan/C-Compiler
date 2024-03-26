@@ -84,7 +84,7 @@ let rec exec_rtl_instr oc rp rtlfunname f st (sp: int) (i: rtl_instr) =
         )  
       ) 
     )
-  | Rstk (rd, ofs) -> Hashtbl.replace st.regs rd (sp + ofs); OK (None, st)
+  | Rstk (rd, ofs) -> Hashtbl.replace st.regs rd (sp - ofs); OK (None, st)
   | Rload (rd, rs, sz) -> 
     (match Hashtbl.find_option st.regs rs with
     | Some addr -> 
