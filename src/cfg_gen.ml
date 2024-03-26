@@ -25,7 +25,7 @@ let rec cfg_expr_of_eexpr (f: efun) (e: Elang.expr) : expr res =
             match (lhe_t, rhe_t) with
             | (Tptr t, Tint) -> 
               if (b = Eadd) || (b = Esub) then
-                (size_type t) >>= (fun size -> OK (Ebinop(b, e1, Ebinop(Emul, e2, Eint size))))
+                (size_type t) >>= (fun size -> OK (Ebinop(b, e1, Ebinop(Emul, e2, Eint (max size (Archi.wordsize ()))))))
               else
                 Error (Format.sprintf "Operation (%s) between %s(%s) and %s(%s) is not defined"
                    (dump_binop b)
@@ -34,7 +34,7 @@ let rec cfg_expr_of_eexpr (f: efun) (e: Elang.expr) : expr res =
                 )
             | (Tint, Tptr t) -> 
               if (b = Eadd) then
-                (size_type t) >>= (fun size -> OK (Ebinop(b, (Ebinop(Emul, e1, Eint size)), e2)))
+                (size_type t) >>= (fun size -> OK (Ebinop(b, (Ebinop(Emul, e1, Eint (max size (Archi.wordsize ())))), e2)))
               else
                 Error (Format.sprintf "Operation (%s) between %s(%s) and %s(%s) is not defined"
                    (dump_binop b)
@@ -71,7 +71,7 @@ let rec cfg_expr_of_eexpr (f: efun) (e: Elang.expr) : expr res =
     cfg_expr_of_eexpr f expr >>= (fun cexpr ->
       (type_expr f.funtypvar f.funtypfun expr) >>= (fun typ ->
         (size_type typ) >>= (fun size ->
-          OK (Eload (cexpr, size))  
+          OK (Eload (cexpr, max size (Archi.wordsize ())))  
         )
       )  
     )
@@ -102,7 +102,7 @@ let rec cfg_node_of_einstr (f: efun) (next: int) (cfg : (int, cfg_node) Hashtbl.
       cfg_expr_of_eexpr f expr >>= (fun e -> 
         if Hashtbl.mem f.funvarinmem v then
           let typ = Hashtbl.find f.funtypvar v and ofs = Hashtbl.find f.funvarinmem v in
-          size_type typ >>= fun size -> Hashtbl.replace cfg next (Cstore(Estk ofs, e, size, succ)); OK(next, next + 1)
+          size_type typ >>= fun size -> Hashtbl.replace cfg next (Cstore(Estk ofs, e, max size (Archi.wordsize ()), succ)); OK(next, next + 1)
         else
           (Hashtbl.replace cfg next (Cassign(v, Some e, succ)); OK (next, next + 1))
       )
@@ -138,7 +138,7 @@ let rec cfg_node_of_einstr (f: efun) (next: int) (cfg : (int, cfg_node) Hashtbl.
         cfg_expr_of_eexpr f e2 >>= (fun rhe ->
           type_expr f.funtypvar f.funtypfun e1 >>= (fun lhe_t ->
             size_type lhe_t >>= fun size -> 
-              Hashtbl.replace cfg next (Cstore (lhe, rhe, size, succ)); 
+              Hashtbl.replace cfg next (Cstore (lhe, rhe, max size (Archi.wordsize ()), succ)); 
               OK(next, next + 1)  
           )
         )  

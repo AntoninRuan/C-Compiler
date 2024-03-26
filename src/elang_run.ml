@@ -42,7 +42,7 @@ let rec eval_eexpr oc (st: (int option) state) (prog: eprog) (f: efun) (sp: int)
                   match (lhe_t, rhe_t) with
                   | (Tptr t, Tint) -> 
                      if (op = Eadd) || (op = Esub) then
-                        (size_type t) >>= (fun size -> OK ((eval_binop op) x (y * size), st))
+                        (size_type t) >>= (fun size -> OK ((eval_binop op) x (y * (max size (Archi.wordsize ()))), st))
                      else
                         Error (Format.sprintf "Operation (%s) between %s(%s) and %s(%s) is not defined"
                            (dump_binop op)
@@ -51,7 +51,7 @@ let rec eval_eexpr oc (st: (int option) state) (prog: eprog) (f: efun) (sp: int)
                         )
                   | (Tint, Tptr t) -> 
                      if op = Eadd then
-                        (size_type t) >>= (fun size -> OK ((eval_binop op) (x * size) y, st))
+                        (size_type t) >>= (fun size -> OK ((eval_binop op) (x * (max size (Archi.wordsize ()))) y, st))
                      else
                         Error (Format.sprintf "Operation (%s) between %s(%s) and %s(%s) is not defined"
                            (dump_binop op)
@@ -103,7 +103,7 @@ let rec eval_eexpr oc (st: (int option) state) (prog: eprog) (f: efun) (sp: int)
    | Eload expr -> (eval_eexpr oc st prog f sp expr) >>= (fun (addr, st) -> 
       (type_expr f.funtypvar f.funtypfun expr) >>= (fun typ ->
          (size_type typ) >>= (fun size ->
-            let res = Mem.read_bytes_as_int st.mem addr size in
+            let res = Mem.read_bytes_as_int st.mem addr (max size (Archi.wordsize ())) in
             res >>= (fun res ->
                OK (res, st)   
             )   
@@ -133,7 +133,7 @@ and eval_einstr oc (st: (int option) state) (prog: eprog) (f: efun) (sp: int) (i
          if (Hashtbl.mem f.funvarinmem str) then (
             let typ = Hashtbl.find f.funtypvar str 
             in (size_type typ) >>= (fun size ->
-               let res = Mem.write_bytes st.mem (sp + (Hashtbl.find f.funvarinmem str)) (split_bytes size x) in
+               let res = Mem.write_bytes st.mem (sp + (Hashtbl.find f.funvarinmem str)) (split_bytes (max size (Archi.wordsize ())) x) in
                res >>= (fun () -> OK(None, st))  
             )
          ) else (
@@ -175,7 +175,7 @@ and eval_einstr oc (st: (int option) state) (prog: eprog) (f: efun) (sp: int) (i
             eval_eexpr oc st prog f sp e2 >>= (fun (x, st) ->
                type_expr f.funtypvar f.funtypfun e1 >>= (fun lhe_t ->
                   size_type lhe_t >>= (fun size ->
-                     let mem_write_res = Mem.write_bytes st.mem addr (split_bytes size x) in
+                     let mem_write_res = Mem.write_bytes st.mem addr (split_bytes (max size (Archi.wordsize ())) x) in
                      mem_write_res >>= (fun () -> OK(None, st))     
                   )  
                )

@@ -353,7 +353,7 @@ let make_fundef_of_ast (typ_fun: (string, typ list * typ) Hashtbl.t) (a: tree) :
           let funstksz = Set.fold (fun e ofs -> 
             let type_size = (size_type (Hashtbl.find typ_var e)) >>! identity in
             Hashtbl.replace funvarinmen e ofs;
-            type_size + ofs
+            (max type_size (Archi.wordsize ())) + ofs
           ) (addr_taken_instr funbody) 0 in
           OK (fname, Some 
             {
