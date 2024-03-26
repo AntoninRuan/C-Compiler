@@ -1,5 +1,6 @@
 open Batteries
 open Utils
+open Archi
 
 type mem_access_size =
   | MAS1
@@ -79,4 +80,11 @@ let rec string_of_type t =
   | Tint -> "int"
   | Tchar -> "char"
   | Tvoid -> "void"
-  | Tptr t -> Format.sprintf "%s pointer" (string_of_type t)
+  | Tptr t -> Format.sprintf "%s*" (string_of_type t)
+
+let rec size_type (t: typ): int res = 
+  match t with
+  | Tint -> OK (size_of_mas (archi_mas ()))
+  | Tchar -> OK 1
+  | Tvoid -> OK 0
+  | Tptr t -> OK (size_of_mas (archi_mas ()))

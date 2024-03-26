@@ -28,6 +28,8 @@ let rec dump_eexpr = function
   | Evar s -> Printf.sprintf "%s" s
   | Echar c -> Printf.sprintf "%c" c
   | Ecall (str, args) -> Printf.sprintf "%s(%s)" str (String.concat "," (List.map dump_eexpr args))
+  | Eaddrof expr -> Printf.sprintf "&%s" (dump_eexpr expr)
+  | Eload expr -> Printf.sprintf "*%s" (dump_eexpr expr)
 
 let indent_size = 2
 let spaces n =
@@ -60,6 +62,9 @@ let rec dump_einstr_rec indent oc i =
   | Icall (str, args) -> 
     print_spaces oc indent;
     Format.fprintf oc "%s(%s);\n" str (String.concat "," (List.map dump_eexpr args))
+  | Istore (e1, e2) ->
+    print_spaces oc indent;
+    Format.fprintf oc "*%s%s;\n" (dump_eexpr e1) (match e2 with | None -> "" | Some e -> Format.sprintf "= %s" (dump_eexpr e))
   | Ibuiltin _ -> ()
 
 let dump_einstr oc i = dump_einstr_rec 0 oc i

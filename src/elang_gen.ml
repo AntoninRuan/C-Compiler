@@ -57,14 +57,50 @@ let rec type_expr (typ_var: (string, typ) Hashtbl.t) (typ_fun: (string, typ list
   | Ecall (str, exprs) -> option_to_res_bind (Hashtbl.find_option typ_fun str)
     (Format.sprintf "Undeclared function %s in expr %s\n" str (dump_eexpr e))
     (fun (_, rt) -> OK (rt))
+  | Eload expr -> (match expr with
+    | Evar _ 
+    | Eload _ -> type_expr typ_var typ_fun expr  
+    | _ -> Error (Format.sprintf "Operation not valid: &%s" (dump_eexpr expr))
+  ) >>= (fun var_type -> match var_type with
+    | Tptr t -> OK t 
+    | _ -> Error (Format.sprintf "Trying to deference %s of type %s" (dump_eexpr expr) (string_of_type var_type)) 
+  )
+  | Eaddrof expr -> (match expr with 
+      | Evar _ 
+      | Eaddrof _ -> type_expr typ_var typ_fun expr
+      | _ -> Error (Format.sprintf "Operation not valid: *%s" (dump_eexpr expr))
+  ) >>= (fun var_type -> OK (Tptr var_type))
+
 and are_compatible (t1: typ) (t2: typ): (bool * typ res) = 
   match (t1, t2) with
   | (Tint, Tint)
   | (Tint, Tchar)
   | (Tchar, Tint) -> (true, OK Tint)
-  | (Tchar, Tchar) -> (true, OK Tchar)
+  | (t, q) when t = q -> (true, OK t)
   | _ -> (false, Error (Format.sprintf "Incompatible type %s and %s\n" (string_of_type t1) (string_of_type t2)))
-  
+
+let rec addr_taken_expr (e: expr): string Set.t = 
+  match e with
+  | Ebinop (_, lexpr, rexpr) -> Set.union (addr_taken_expr lexpr) (addr_taken_expr rexpr)
+  | Eunop (_, expr) -> addr_taken_expr expr
+  | Eint _ -> Set.empty
+  | Evar _ -> Set.empty
+  | Echar _ -> Set.empty
+  | Ecall (_, exprs) -> List.fold_left (fun acc elt -> Set.union acc (addr_taken_expr elt)) Set.empty exprs
+  | Eaddrof expr -> (match expr with | Evar str -> Set.singleton str | Eaddrof e -> addr_taken_expr e | _ -> Set.empty)
+  | Eload expr -> Set.empty
+
+let rec addr_taken_instr (i: instr) : (string Set.t) =
+  match i with
+  | Iassign (_, expr) -> (match expr with | None -> Set.empty | Some e -> addr_taken_expr e)
+  | Iif (cnd, linstr, rinstr) -> Set.union (addr_taken_expr cnd) (Set.union (addr_taken_instr linstr) (addr_taken_instr rinstr))
+  | Iwhile (cnd, instr) -> Set.union (addr_taken_expr cnd) (addr_taken_instr instr)
+  | Iblock instrs -> List.fold_left (fun acc elt -> Set.union acc (addr_taken_instr elt)) Set.empty instrs
+  | Ireturn expr -> addr_taken_expr expr
+  | Icall (_, exprs) -> List.fold_left (fun acc elt -> Set.union acc (addr_taken_expr elt)) Set.empty exprs
+  | Istore (_, expr) -> (match expr with | None -> Set.empty | Some expr -> addr_taken_expr expr)
+  | Ibuiltin (_, _) -> Set.empty
+
 (* [make_eexpr_of_ast a] builds an expression corresponding to a tree [a]. If
    the tree is not well-formed, fails with an [Error] message. *)
 let rec make_eexpr_of_ast (typ_var: (string, typ) Hashtbl.t) (typ_fun: (string, typ list * typ) Hashtbl.t) (a: tree) : expr res =
@@ -89,6 +125,8 @@ let rec make_eexpr_of_ast (typ_var: (string, typ) Hashtbl.t) (typ_fun: (string, 
     | Node(t, [IntLeaf x]) when t = Tlitteral -> OK (Eint x)
     | Node(t, [CharLeaf c]) when t = Tlitteral -> OK (Echar c)
     | Node(t, (StringLeaf s)::_) when t = Tvar -> OK(Evar s)
+    | Node(t, [subtree]) when t = Tref -> make_eexpr_of_ast typ_var typ_fun subtree >>= (fun e -> OK (Eaddrof e))
+    | Node(t, [subtree]) when t = Tderef -> make_eexpr_of_ast typ_var typ_fun subtree >>= (fun e -> OK (Eload e))
     | Node(t, [StringLeaf s; Node(Targs, args)]) when t = Tfuncall -> 
       let subtree_list = List.map (make_eexpr_of_ast typ_var typ_fun) args in 
       let args_list = List.map (fun elt -> error_fail elt identity) subtree_list in
@@ -117,6 +155,25 @@ let rec make_eexpr_of_ast (typ_var: (string, typ) Hashtbl.t) (typ_fun: (string, 
   | Error msg -> Error (Format.sprintf "In make_eexpr_of_ast %s:\n%s"
                           (string_of_ast a) msg)
 
+let rec make_evar_of_ast (typ_var: (string, typ) Hashtbl.t) (a: tree): (string * typ option) res =
+  match a with
+  | Node(Tvar, [StringLeaf vname]) -> OK (vname, None)
+  | Node(Tvar, [StringLeaf vname; Node(Ttype, [typ])]) -> OK (vname, Some (typ_of_typeleaf typ))
+  | Node(Tderef, [sub]) -> 
+    (make_evar_of_ast typ_var sub) >>= (fun (s, option) ->  
+      let typ = (match option with
+        | None ->  option_to_res_bind (Hashtbl.find_option typ_var s)
+          (Format.sprintf "Undeclared variable %s" s)
+          (fun x -> OK x)
+        | Some t -> OK t  
+      )
+      in 
+      typ >>= (fun t -> 
+        OK (s, Some t)
+      )
+    )
+  | _ -> Error (Format.sprintf "Unacceptable ast in make_evar_of_ast %s" (string_of_ast a))
+
 let rec make_einstr_of_ast (cfun: string) (typ_var: (string, typ) Hashtbl.t) (typ_fun: (string, typ list * typ) Hashtbl.t) (a: tree) : instr res =
   let res =
     match a with
@@ -138,13 +195,6 @@ let rec make_einstr_of_ast (cfun: string) (typ_var: (string, typ) Hashtbl.t) (ty
             )  
           )  
         )
-        (* let ecnd_res = make_eexpr_of_ast typ_var typ_fun cnd 
-          and if_instr_res = make_einstr_of_ast typ_var typ_fun if_block 
-          and else_instr_res = make_einstr_of_ast typ_var typ_fun else_block in
-        let ecnd = error_fail ecnd_res identity 
-          and if_instr = error_fail if_instr_res identity 
-          and else_instr = error_fail else_instr_res identity
-        in OK (Iif (ecnd, if_instr, else_instr)) *)
       | [cnd; if_block] -> 
         (make_eexpr_of_ast typ_var typ_fun cnd) >>= (fun ecnd ->
           (make_einstr_of_ast cfun typ_var typ_fun if_block) >>= (fun if_instrs ->
@@ -155,9 +205,6 @@ let rec make_einstr_of_ast (cfun: string) (typ_var: (string, typ) Hashtbl.t) (ty
             )  
           )  
         )
-        (* let ecnd_res = make_eexpr_of_ast typ_var typ_fun cnd and if_instr_res = make_einstr_of_ast typ_var typ_fun if_block 
-        in let ecnd = error_fail ecnd_res identity and if_instr = error_fail if_instr_res identity
-        in OK(Iif(ecnd , if_instr, Iblock [])) *)
       | _ -> Error "" 
     )
     | Node(t, [cnd; instrs]) when t = Twhile -> 
@@ -168,9 +215,6 @@ let rec make_einstr_of_ast (cfun: string) (typ_var: (string, typ) Hashtbl.t) (ty
           )  
         )  
       )
-      (* let icnd_res = make_eexpr_of_ast typ_var typ_fun cnd and instrs = make_einstr_of_ast typ_var typ_fun instrs
-      in let icnd = error_fail icnd_res identity and instrs = error_fail instrs identity in
-      OK (Iwhile (icnd, instrs)) *)
     | Node(t, [expr]) when t = Treturn -> 
       (make_eexpr_of_ast typ_var typ_fun expr) >>= (fun expr ->
         (type_expr typ_var typ_fun expr) >>= (fun ret_type ->
@@ -185,33 +229,48 @@ let rec make_einstr_of_ast (cfun: string) (typ_var: (string, typ) Hashtbl.t) (ty
             )  
         )  
       )
-      (* let eexpr = error_fail (make_eexpr_of_ast typ_var typ_fun expr) identity in OK(Ireturn eexpr) *)
-    | Node(t, (Node(Tassignvar, [Node(Tvar, (StringLeaf id)::typ)]))::s) when t = Tassign ->
-      let get_type (potential_type: typ option) : typ res =
-        option_to_res_bind potential_type
-        (Format.sprintf "Undeclared variable %s" id)
-        (fun typ -> OK typ)
-      in
-      let potential_type = (match typ with 
-        | (Node(Ttype, [TypeLeaf t]))::_ -> Some t 
-        | _ -> Hashtbl.find_option typ_var id
-        ) in 
-      (get_type potential_type) >>= (fun typ ->
-        match typ with
-        | Tvoid -> Error (Format.sprintf "Cannot declare variable %s as type void" id)
-        | _ -> Hashtbl.replace typ_var id typ; (match s with 
-          | [] -> OK (Iassign(id, None))
-          | expr::_ -> (make_eexpr_of_ast typ_var typ_fun expr) >>= (fun expr ->
-              (type_expr typ_var typ_fun expr) >>= (fun t_expr ->
-                if (fst (are_compatible typ t_expr)) then 
-                  OK (Iassign(id, Some expr))
-                else 
-                  Error (Format.sprintf "Incompatible type trying to assign %s type to %s type variable %s" 
-                    (string_of_type t_expr) 
-                    (string_of_type typ)
-                    id )  
-              )
+    | Node(t, (Node(Tassignvar, [le]))::s) when t = Tassign ->
+      make_evar_of_ast typ_var le >>= (fun (id, potential_type) -> 
+        let get_type (potential_type: typ option) : typ res =
+          option_to_res_bind potential_type
+          (Format.sprintf "Undeclared variable %s" id)
+          (fun typ -> OK typ)
+        in
+        (get_type potential_type) >>= (fun typ ->
+          match typ with
+          | Tvoid -> Error (Format.sprintf "Cannot declare variable %s as type void" id)
+          | Tptr t -> Hashtbl.replace typ_var id typ; (match s with
+            | [] -> (make_eexpr_of_ast typ_var typ_fun le) >>= (fun e -> OK (Istore(e, None)))
+            | expr::_ -> (make_eexpr_of_ast typ_var typ_fun le) >>= (fun lhe ->
+              (make_eexpr_of_ast typ_var typ_fun expr) >>= (fun rhe ->
+                (type_expr typ_var typ_fun lhe) >>= (fun lhe_t ->
+                  (type_expr typ_var typ_fun rhe) >>= (fun rhe_t ->
+                  if (fst (are_compatible lhe_t rhe_t)) then
+                    OK (Istore(lhe, Some rhe))
+                  else
+                    Error (Format.sprintf "Incompatible type trying to assign %s to %s variable %s" 
+                      (string_of_type rhe_t) 
+                      (string_of_type typ)
+                      id )
+                  )
+                )
+              )  
             )
+          )
+          | _ -> Hashtbl.replace typ_var id typ; (match s with 
+            | [] -> OK (Iassign(id, None))
+            | expr::_ -> (make_eexpr_of_ast typ_var typ_fun expr) >>= (fun expr ->
+                (type_expr typ_var typ_fun expr) >>= (fun t_expr ->
+                  if (fst (are_compatible typ t_expr)) then 
+                    OK (Iassign(id, Some expr))
+                  else 
+                    Error (Format.sprintf "Incompatible type trying to assign %s to %s variable %s" 
+                      (string_of_type t_expr) 
+                      (string_of_type typ)
+                      id )  
+                )
+              )
+          )
         )
       )
       (* let eid = error_fail (make_eexpr_of_ast typ_var typ_fun id) identity
@@ -266,10 +325,22 @@ let make_fundef_of_ast (typ_fun: (string, typ list * typ) Hashtbl.t) (a: tree) :
         (fun x -> OK x) in
       fun_sign >>= (fun sign ->
         (make_funsig_of_ast a) >>= (fun potential_sig -> 
-          let typ_var = Hashtbl.create 17 in
+          let typ_var = Hashtbl.create 17 and funvarinmen = Hashtbl.create 17 in
           List.iter (fun (var_name, typ) -> Hashtbl.replace typ_var var_name typ) fargs;
           let funbody = (make_einstr_of_ast fname typ_var typ_fun fbody) >>! identity in
-          OK (fname, Some {funreturntype = typ_of_typeleaf typ;funargs = fargs; funbody = funbody})
+          let funstksz = Set.fold (fun e ofs -> 
+            let type_size = (size_type (Hashtbl.find typ_var e)) >>! identity in
+            Hashtbl.replace funvarinmen e ofs;
+            type_size + ofs
+          ) (addr_taken_instr funbody) 0 in
+          OK (fname, Some 
+            {
+              funreturntype = typ_of_typeleaf typ;
+              funargs = fargs;
+              funbody = funbody;
+              funvarinmem = funvarinmen;
+              funstksz = funstksz;
+            })
         ) 
       )
   | Node (Tfundef, [Node(Ttype, [typ]); Node(Tfunname, [StringLeaf fname]); Node (Tfunargs, fargs); Node(Tfunbody, _)]) ->

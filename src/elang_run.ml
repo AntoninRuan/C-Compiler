@@ -47,6 +47,8 @@ let rec eval_eexpr oc (st: (int option) state) (prog: eprog) (e : expr) : (int *
    | Ecall (str, args) -> let args_values, st = eval_args oc st prog args in 
       let result, st = (eval_efun oc st prog ((find_function prog str) >>! identity) str args_values) >>! identity in 
       (match result with None -> Error (Printf.sprintf "Function %s does has not returned any value" str) | Some value -> OK(value, st))
+   | Eaddrof expr -> Error "Not implemented yet"
+   | Eload expr -> Error "Not implemented yet"
 
 (* [eval_einstr oc st ins] évalue l'instrution [ins] en partant de l'état [st].
 
@@ -88,6 +90,7 @@ and eval_einstr oc (st: (int option) state) (prog: eprog) (ins: instr) :
    | Ireturn expr -> let value, st = (eval_eexpr oc st prog expr) >>! identity in OK (Some value, st)
    | Icall (str, args) -> let args_values, st = eval_args oc st prog args in 
       let result, st = (eval_efun oc st prog ((find_function prog str) >>! identity) str args_values) >>! identity in OK (None, st)
+   | Istore (e1, e2) -> Error "Not implemeted yet"
    | Ibuiltin (str, vargs) -> 
       (do_builtin oc st.mem str (List.map (fun elt -> 
          let res = option_to_res_bind (Hashtbl.find st.env elt) 
@@ -146,12 +149,19 @@ and eval_efun oc (st: (int option) state) (prog: eprog) ({ funargs; funbody}: ef
    *)
 let eval_eprog oc (ep: eprog) (memsize: int) (params: int list)
   : int option res =
-  let (st: (int option) state) = init_state memsize in
-  let ep = ("print", Gfun({funreturntype = Tvoid; funargs = [("x", Tint)]; funbody = Ibuiltin("print", ["x"])}))::ep in
-  find_function ep "main" >>= fun f ->
-  (* ne garde que le nombre nécessaire de paramètres pour la fonction "main". *)
-  let n = List.length f.funargs in
-  let params = take n params in
-  List.iter2 (fun (name, _) value -> Hashtbl.replace st.env name (Some value)) f.funargs params;
-  eval_efun oc st ep f "main" params >>= fun (v, _) ->
-  OK v
+   let (st: (int option) state) = init_state memsize in
+   let ep = ("print", Gfun(
+      {
+         funreturntype = Tvoid; 
+         funargs = [("x", Tint)]; 
+         funvarinmem = Hashtbl.create 17;
+         funstksz = 0;
+         funbody = Ibuiltin("print", ["x"])
+      }))::ep in
+   find_function ep "main" >>= fun f ->
+   (* ne garde que le nombre nécessaire de paramètres pour la fonction "main". *)
+   let n = List.length f.funargs in
+   let params = take n params in
+   List.iter2 (fun (name, _) value -> Hashtbl.replace st.env name (Some value)) f.funargs params;
+   eval_efun oc st ep f "main" params >>= fun (v, _) ->
+   OK v
