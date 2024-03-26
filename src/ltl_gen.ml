@@ -56,7 +56,7 @@ let load_loc tmp allocation numlocals r =
   match Hashtbl.find_option allocation r with
   | None ->
     Error (Format.sprintf "Unable to allocate RTL register r%d." r)
-  | Some (Stk o) -> OK ([LLoad(tmp, reg_fp, numlocals + (Archi.wordsize ()) * o, (archi_mas ()))], tmp)
+  | Some (Stk o) -> OK ([LLoad(tmp, reg_fp, (numlocals - 1) + (Archi.wordsize ()) * o, (archi_mas ()))], tmp)
   | Some (Reg r) -> OK ([], r)
 
 (* store_loc tmp allocation r = (l, r'). I want to write in RTL register r.
@@ -65,7 +65,7 @@ let store_loc tmp allocation numlocals r =
   match Hashtbl.find_option allocation r with
   | None ->
     Error (Format.sprintf "Unable to allocate RTL register r%d." r)
-  | Some (Stk o) -> OK ([LStore(reg_fp, numlocals + (Archi.wordsize ()) * o, tmp, (archi_mas ()))], tmp)
+  | Some (Stk o) -> OK ([LStore(reg_fp, (numlocals - 1) + (Archi.wordsize ()) * o, tmp, (archi_mas ()))], tmp)
   | Some (Reg r) -> OK ([], r)
 
 (* saves registers in [to_save] on the stack at offsets [fp + 8 * o, fp + 8 * (o
@@ -393,7 +393,7 @@ let ltl_fun_of_linear_fun linprog
   let prologue =
     List.concat (List.map make_push (Set.to_list callee_saved_regs)) @
     LMov (reg_fp, reg_sp) ::
-    make_sp_sub ((numlocals + numspilled) * (Archi.wordsize ())) @
+    make_sp_sub ((numlocals - 1 + numspilled) * (Archi.wordsize ())) @
     [LComment "end prologue"] in
   let epilogue = LLabel epilogue_label ::
                  LMov(reg_sp, reg_fp) ::
