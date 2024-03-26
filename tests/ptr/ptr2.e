@@ -1,5 +1,5 @@
 int main(){
-  int x = 0;
+  int x = 1;
   int *y = &x;
   int** z = &y;
   **z = 3;
