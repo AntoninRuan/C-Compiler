@@ -165,7 +165,7 @@ let var_in_eaddr_of (e: expr) : (string res) =
 
 let rec make_evar_of_ast (typ_var: (string, typ) Hashtbl.t) (a: tree): (bool * string * typ option) res =
   match a with
-  | Node(Tvar, [StringLeaf vname]) -> OK (false, vname, None)
+  | Node(Tvar, [StringLeaf vname]) -> OK (false, vname, Hashtbl.find_option typ_var vname)
   | Node(Tvar, [StringLeaf vname; Node(Ttype, [typ])]) -> OK (true, vname, Some (typ_of_typeleaf typ))
   | Node(Tderef, [sub]) -> 
     (make_evar_of_ast typ_var sub) >>= (fun (b, s, option) ->  
@@ -241,7 +241,7 @@ let rec make_einstr_of_ast (cfun: string) (typ_var: (string, typ) Hashtbl.t) (ty
       make_evar_of_ast typ_var le >>= (fun (is_declaration, id, potential_type) -> 
         let get_type (potential_type: typ option) : typ res =
           option_to_res_bind potential_type
-          (Format.sprintf "Undeclared variable %s" id)
+          (Format.sprintf "Undeclared variable %s in assignation left hand side" id)
           (fun typ -> OK typ)
         in
         (get_type potential_type) >>= (fun typ ->
