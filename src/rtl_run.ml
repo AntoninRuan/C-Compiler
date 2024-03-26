@@ -104,6 +104,9 @@ let rec exec_rtl_instr oc rp rtlfunname f st (sp: int) (i: rtl_instr) =
     | (Some addr, Some v) -> 
       Mem.write_bytes st.mem addr (split_bytes sz v) >>= fun () -> OK (None, st)
     | _ -> Error (Format.sprintf "store on some undefined register (%s, %s)" (print_reg rd) (print_reg rs)))
+  | Rbuiltin (fname, args) -> let _ = do_builtin oc st.mem fname (List.map (fun elt -> 
+      Hashtbl.find st.regs elt
+  ) args) in OK (None, st)
 
 and exec_rtl_instr_at oc rp rtlfunname ({ rtlfunbody;  } as f: rtl_fun) st (sp: int) i =
   match Hashtbl.find_option rtlfunbody i with
@@ -140,6 +143,15 @@ and exec_rtl_fun oc rp st (sp: int) rtlfunname f params =
 
 and exec_rtl_prog oc rp memsize params =
   let st = init_state memsize in
+  let rp = ("print", Gfun {
+    rtlfunargs = [0];
+    rtlfunstksz = 0;
+    rtlfuninfo = [("x", 0)];
+    rtlfunentry = 0;
+    rtlfunbody = (let body = Hashtbl.create 2 in
+    Hashtbl.replace body 0 [Rbuiltin("print", [0])];
+    body)
+  })::rp in
   find_function rp "main" >>= fun f ->
   let n = List.length f.rtlfunargs in
   let params = take n params in
