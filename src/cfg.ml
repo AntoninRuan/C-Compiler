@@ -19,6 +19,7 @@ type cfg_node =
   | Cnop of int
   | Ccall of string * expr list * int
   | Cstore of expr * expr * int * int
+  | Cbuiltin of string * string list * int
 
 type cfg_fun = {
   cfgfunargs: (string * typ) list;
@@ -41,6 +42,7 @@ let succs cfg n =
   | Some (Cnop s) -> Set.singleton s
   | Some (Ccall (_, _, s)) -> Set.singleton s
   | Some (Cstore (_, _, _, s)) -> Set.singleton s
+  | Some (Cbuiltin (_, _, s)) -> Set.singleton s
 
 
 (* [preds cfg n] donne l'ensemble des prédécesseurs d'un nœud [n] dans un CFG [cfg]
@@ -51,6 +53,7 @@ let preds cfgfunbody n =
       | Cassign (_, _, s)
       | Ccall (_, _, s)
       | Cstore (_, _, _, s)
+      | Cbuiltin ( _, _, s)
       | Cnop s -> if s = n then Set.add m acc else acc
       | Creturn _ -> acc
       | Ccmp (_, s1, s2) -> if s1 = n || s2 = n then Set.add m acc else acc
@@ -82,6 +85,7 @@ let size_instr (i: cfg_node) : int =
   | Cnop _ -> 1
   | Ccall (_, args, _) -> 1 + (List.fold (fun acc elt -> acc + size_expr elt) 0 args)
   | Cstore (e1, e2, _, _) -> 1 + (size_expr e1) + (size_expr e2)
+  | Cbuiltin (name, args, _) -> 1
 
 let size_fun f =
   Hashtbl.fold (fun _ v acc -> acc + size_instr v) f 0

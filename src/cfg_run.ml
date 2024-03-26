@@ -82,6 +82,15 @@ and eval_cfginstr oc (st: (int option) state) ht (prog: cfg_fun prog) (f: cfg_fu
           mem_write_res >>= fun () -> eval_cfginstr oc st ht prog f sp succ
         )
       )
+    | Cbuiltin (fname, args, succ) ->
+      let _ = do_builtin oc st.mem fname (List.map (fun elt -> 
+        let res = option_to_res_bind (Hashtbl.find st.env elt) 
+        (Format.sprintf "Variable %s not initialized" elt)
+        (fun x -> OK x) in 
+        res >>! identity
+      ) args) in 
+      eval_cfginstr oc st ht prog f sp succ
+
 
 and eval_cfgfun oc st prog cfgfunname (f: cfg_fun) (sp: int) (vargs: int list) =
   let st' = { st with env = Hashtbl.create 17 } in
@@ -97,6 +106,15 @@ and eval_cfgfun oc st prog cfgfunname (f: cfg_fun) (sp: int) (vargs: int list) =
 
 let eval_cfgprog oc cp memsize params =
   let st = init_state memsize in
+  let cp = ("print", Gfun {
+    cfgentry = 1;
+    cfgfunargs = [("x", Tint)];
+    cfgfunstksz = 0;
+    cfgfunbody = (let body = Hashtbl.create 1 in 
+    Hashtbl.replace body 1 (Cbuiltin("print", ["x"], 0));
+    Hashtbl.replace body 0 (Creturn(Eint 0));
+    body) 
+  })::cp in
   find_function cp "main" >>= fun f ->
   let n = List.length f.cfgfunargs in
   let params = take n params in

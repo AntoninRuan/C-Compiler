@@ -189,8 +189,8 @@ and eval_einstr oc (st: (int option) state) (prog: eprog) (f: efun) (sp: int) (i
          (Format.sprintf "Variable %s not initialized" elt)
          (fun x -> OK x) in 
          res >>! identity
-      ) vargs)) >>= (fun x ->
-         OK(x, st)
+      ) vargs)) >>= (fun _ ->
+         OK(None, st)
       )
       
 

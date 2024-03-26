@@ -159,6 +159,7 @@ let rec reachable_nodes n (cfg: (int,cfg_node) Hashtbl.t) =
       | Some (Cnop succ)
       | Some (Ccall (_, _, succ))
       | Some (Cstore (_, _, _, succ))
+      | Some (Cbuiltin (_, _, succ))
       | Some (Cassign (_, _, succ)) -> reachable_aux succ reach
       | Some (Creturn _) -> reach
       | Some (Ccmp (_, s1, s2)) ->

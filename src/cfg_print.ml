@@ -10,7 +10,7 @@ let rec dump_cfgexpr : expr -> string = function
   | Evar s -> Format.sprintf "%s" s
   | Ecall (str, args) -> Format.sprintf "%s(%s)" str (String.concat "," (List.map dump_cfgexpr args))
   | Estk i -> Format.sprintf "Stk %d" i
-  | Eload (e, sz) -> Format.sprintf "load (%s) (%d bytes)" (dump_cfgexpr e) sz
+  | Eload (e, sz) -> Format.sprintf "mem[%s] (%d bytes)" (dump_cfgexpr e) sz
 
 let dump_list_cfgexpr l =
   l |> List.map dump_cfgexpr |> String.concat ", "
@@ -21,12 +21,14 @@ let dump_arrows oc fname n (node: cfg_node) =
   | Cassign (_, _, succ)
   | Ccall (_, _, succ)
   | Cstore (_, _, _, succ)
+  | Cbuiltin (_, _, succ) 
   | Cnop succ ->
     Format.fprintf oc "n_%s_%d -> n_%s_%d\n" fname n fname succ
   | Creturn _ -> ()
   | Ccmp (_, succ1, succ2) ->
     Format.fprintf oc "n_%s_%d -> n_%s_%d [label=\"then\"]\n" fname n fname succ1;
     Format.fprintf oc "n_%s_%d -> n_%s_%d [label=\"else\"]\n" fname n fname succ2
+
 
 
 let dump_cfg_node oc (node: cfg_node) =
@@ -38,6 +40,7 @@ let dump_cfg_node oc (node: cfg_node) =
   | Cnop _ -> Format.fprintf oc "nop"
   | Ccall (str, args, _) -> Format.fprintf oc "%s(%s)" str (String.concat "," (List.map dump_cfgexpr args))
   | Cstore (e1, e2, sz, _) -> Format.fprintf oc "%s <- %s (%d bytes)" (dump_cfgexpr e1) (dump_cfgexpr e2) sz
+  | Cbuiltin (_, _, _) -> Format.fprintf oc "Builtin"
 
 
 let dump_liveness_state oc ht state =
