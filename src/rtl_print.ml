@@ -45,6 +45,9 @@ let dump_rtl_instr name (live_in, live_out) ?(endl="\n") oc (i: rtl_instr) =
       (match reg_option with None -> "" | Some rd -> print_reg rd) 
       fname 
       (String.concat "," (List.map print_reg args))
+  | Rstk (rd, ofs) -> Format.fprintf oc "%s <- Stk %d" (print_reg rd) ofs
+  | Rload (rd, rs, sz) -> Format.fprintf oc "%s <- mem[%s] (%d bytes)" (print_reg rd) (print_reg rs) sz
+  | Rstore (rd, rs, sz) -> Format.fprintf oc "mem[%s] <- %s (%d bytes)" (print_reg rd) (print_reg rs) sz
   end;
   Format.fprintf oc "%s" endl;
   dump_liveness live_out "after"
