@@ -29,6 +29,8 @@ type efun = {
   funargs: ( string * typ ) list;
   funvarinmem: (string, int) Hashtbl.t;
   funstksz: int;
+  funtypvar: (string, typ) Hashtbl.t;
+  funtypfun: (string, (typ list * typ)) Hashtbl.t;
   funbody: instr;
 }
 

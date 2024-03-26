@@ -76,6 +76,8 @@ and are_compatible (t1: typ) (t2: typ): (bool * typ res) =
   | (Tint, Tint)
   | (Tint, Tchar)
   | (Tchar, Tint) -> (true, OK Tint)
+  | (Tptr t, Tint)
+  | (Tint, Tptr t) -> (true, OK (Tptr t)) 
   | (t, q) when t = q -> (true, OK t)
   | _ -> (false, Error (Format.sprintf "Incompatible type %s and %s\n" (string_of_type t1) (string_of_type t2)))
 
@@ -87,7 +89,8 @@ let rec addr_taken_expr (e: expr): string Set.t =
   | Evar _ -> Set.empty
   | Echar _ -> Set.empty
   | Ecall (_, exprs) -> List.fold_left (fun acc elt -> Set.union acc (addr_taken_expr elt)) Set.empty exprs
-  | Eaddrof expr -> (match expr with | Evar str -> Set.singleton str | Eaddrof e -> addr_taken_expr e | _ -> Set.empty)
+  | Eaddrof (Evar str) -> Set.singleton str
+  | Eaddrof _ -> Set.empty
   | Eload expr -> Set.empty
 
 let rec addr_taken_instr (i: instr) : (string Set.t) =
@@ -155,12 +158,12 @@ let rec make_eexpr_of_ast (typ_var: (string, typ) Hashtbl.t) (typ_fun: (string, 
   | Error msg -> Error (Format.sprintf "In make_eexpr_of_ast %s:\n%s"
                           (string_of_ast a) msg)
 
-let rec make_evar_of_ast (typ_var: (string, typ) Hashtbl.t) (a: tree): (string * typ option) res =
+let rec make_evar_of_ast (typ_var: (string, typ) Hashtbl.t) (a: tree): (bool * string * typ option) res =
   match a with
-  | Node(Tvar, [StringLeaf vname]) -> OK (vname, None)
-  | Node(Tvar, [StringLeaf vname; Node(Ttype, [typ])]) -> OK (vname, Some (typ_of_typeleaf typ))
+  | Node(Tvar, [StringLeaf vname]) -> OK (false, vname, None)
+  | Node(Tvar, [StringLeaf vname; Node(Ttype, [typ])]) -> OK (true, vname, Some (typ_of_typeleaf typ))
   | Node(Tderef, [sub]) -> 
-    (make_evar_of_ast typ_var sub) >>= (fun (s, option) ->  
+    (make_evar_of_ast typ_var sub) >>= (fun (b, s, option) ->  
       let typ = (match option with
         | None ->  option_to_res_bind (Hashtbl.find_option typ_var s)
           (Format.sprintf "Undeclared variable %s" s)
@@ -169,7 +172,7 @@ let rec make_evar_of_ast (typ_var: (string, typ) Hashtbl.t) (a: tree): (string *
       )
       in 
       typ >>= (fun t -> 
-        OK (s, Some t)
+        OK (false, s, Some t)
       )
     )
   | _ -> Error (Format.sprintf "Unacceptable ast in make_evar_of_ast %s" (string_of_ast a))
@@ -230,7 +233,7 @@ let rec make_einstr_of_ast (cfun: string) (typ_var: (string, typ) Hashtbl.t) (ty
         )  
       )
     | Node(t, (Node(Tassignvar, [le]))::s) when t = Tassign ->
-      make_evar_of_ast typ_var le >>= (fun (id, potential_type) -> 
+      make_evar_of_ast typ_var le >>= (fun (is_declaration, id, potential_type) -> 
         let get_type (potential_type: typ option) : typ res =
           option_to_res_bind potential_type
           (Format.sprintf "Undeclared variable %s" id)
@@ -239,25 +242,39 @@ let rec make_einstr_of_ast (cfun: string) (typ_var: (string, typ) Hashtbl.t) (ty
         (get_type potential_type) >>= (fun typ ->
           match typ with
           | Tvoid -> Error (Format.sprintf "Cannot declare variable %s as type void" id)
-          | Tptr t -> Hashtbl.replace typ_var id typ; (match s with
-            | [] -> (make_eexpr_of_ast typ_var typ_fun le) >>= (fun e -> OK (Istore(e, None)))
-            | expr::_ -> (make_eexpr_of_ast typ_var typ_fun le) >>= (fun lhe ->
-              (make_eexpr_of_ast typ_var typ_fun expr) >>= (fun rhe ->
-                (type_expr typ_var typ_fun lhe) >>= (fun lhe_t ->
-                  (type_expr typ_var typ_fun rhe) >>= (fun rhe_t ->
-                  if (fst (are_compatible lhe_t rhe_t)) then
-                    OK (Istore(lhe, Some rhe))
-                  else
-                    Error (Format.sprintf "Incompatible type trying to assign %s to %s variable %s" 
-                      (string_of_type rhe_t) 
-                      (string_of_type typ)
-                      id )
+          | Tptr t -> 
+            Hashtbl.replace typ_var id typ; 
+            (match s with
+            | [] -> 
+              (make_eexpr_of_ast typ_var typ_fun le) >>= (fun e -> 
+                if is_declaration then 
+                  OK (Iassign(id, None))
+                else
+                  OK (Istore(e, None)) 
+              )
+            | expr::_ -> 
+              (make_eexpr_of_ast typ_var typ_fun le) >>= (fun lhe ->
+                (make_eexpr_of_ast typ_var typ_fun expr) >>= (fun rhe ->
+                  (type_expr typ_var typ_fun lhe) >>= (fun lhe_t ->
+                    (type_expr typ_var typ_fun rhe) >>= (fun rhe_t ->
+                    if (fst (are_compatible lhe_t rhe_t)) then
+                      if is_declaration then
+                        OK (Iassign(id, Some rhe))
+                      else
+                        OK (Istore(lhe, Some rhe))
+                    else
+                      Error (Format.sprintf "Incompatible type trying to assign %s to %s variable %s" 
+                        (string_of_type rhe_t) 
+                        (string_of_type typ)
+                        id )
+                    )
                   )
-                )
-              )  
+                )  
+              )
             )
-          )
-          | _ -> Hashtbl.replace typ_var id typ; (match s with 
+          | _ -> 
+            Hashtbl.replace typ_var id typ; 
+            (match s with 
             | [] -> OK (Iassign(id, None))
             | expr::_ -> (make_eexpr_of_ast typ_var typ_fun expr) >>= (fun expr ->
                 (type_expr typ_var typ_fun expr) >>= (fun t_expr ->
@@ -270,7 +287,7 @@ let rec make_einstr_of_ast (cfun: string) (typ_var: (string, typ) Hashtbl.t) (ty
                       id )  
                 )
               )
-          )
+            )
         )
       )
       (* let eid = error_fail (make_eexpr_of_ast typ_var typ_fun id) identity
@@ -339,6 +356,8 @@ let make_fundef_of_ast (typ_fun: (string, typ list * typ) Hashtbl.t) (a: tree) :
               funargs = fargs;
               funbody = funbody;
               funvarinmem = funvarinmen;
+              funtypvar = typ_var;
+              funtypfun = typ_fun;
               funstksz = funstksz;
             })
         ) 

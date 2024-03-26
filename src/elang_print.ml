@@ -64,7 +64,7 @@ let rec dump_einstr_rec indent oc i =
     Format.fprintf oc "%s(%s);\n" str (String.concat "," (List.map dump_eexpr args))
   | Istore (e1, e2) ->
     print_spaces oc indent;
-    Format.fprintf oc "*%s%s;\n" (dump_eexpr e1) (match e2 with | None -> "" | Some e -> Format.sprintf "= %s" (dump_eexpr e))
+    Format.fprintf oc "%s%s;\n" (dump_eexpr e1) (match e2 with | None -> "" | Some e -> Format.sprintf " = %s" (dump_eexpr e))
   | Ibuiltin _ -> ()
 
 let dump_einstr oc i = dump_einstr_rec 0 oc i
@@ -73,7 +73,7 @@ let dump_einstr oc i = dump_einstr_rec 0 oc i
 let dump_efun oc funname {funargs; funbody} =
   Format.fprintf oc "%s(%s) %a\n"
     funname
-    (String.concat "," (List.map (fun (s, t) -> Format.sprintf "%s %s" s (string_of_type t)) funargs))
+    (String.concat "," (List.map (fun (s, t) -> Format.sprintf "%s %s" (string_of_type t) s) funargs))
     dump_einstr funbody
 
 let dump_eprog oc = dump_prog dump_efun oc

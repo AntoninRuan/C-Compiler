@@ -82,9 +82,9 @@ let rec string_of_type t =
   | Tvoid -> "void"
   | Tptr t -> Format.sprintf "%s*" (string_of_type t)
 
-let rec size_type (t: typ): int res = 
+let size_type (t: typ): int res = 
   match t with
   | Tint -> OK (size_of_mas (archi_mas ()))
   | Tchar -> OK 1
   | Tvoid -> OK 0
-  | Tptr t -> OK (size_of_mas (archi_mas ()))
+  | Tptr _ -> OK (size_of_mas (archi_mas ()))

@@ -81,9 +81,7 @@ DEREFS -> SYM_ASTERISK RDEREF { fun x -> Node(Tderef, [$2 x]) }
 RDEREF -> { fun x -> x }
 RDEREF -> SYM_ASTERISK RDEREF {fun x -> Node(Tderef, [$2 x])}
 
-REFS -> SYM_AMPERSAND RREF {fun x -> Node(Tref, [$2 x])}
-RREF -> {fun x -> x}
-RREF -> SYM_AMPERSAND RREF {fun x -> Node(Tref, [$2 x]) } 
+REFS -> SYM_AMPERSAND {fun x -> Node(Tref, [x])} 
 
 PTR_OPERATION -> {fun x -> x}
 PTR_OPERATION -> DEREFS { fun x -> $1 x }
