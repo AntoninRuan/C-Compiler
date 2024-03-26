@@ -30,11 +30,6 @@ let eval_unop (u: unop) : int -> int =
   match u with
    | Eneg -> fun x -> -x
 
-let var_in_eaddr_of (e: expr) : (string res) =
-   match e with 
-   | Eaddrof (Evar str) -> OK str
-   | _ -> Error (Format.sprintf "Trying to get address of something that is not a variable: %s" (dump_eexpr e))
-
 (* [eval_eexpr st e] évalue l'expression [e] dans l'état [st]. Renvoie une
    erreur si besoin. *)
 let rec eval_eexpr oc (st: (int option) state) (prog: eprog) (f: efun) (sp: int) (e : expr) : (int * (int option) state) res =

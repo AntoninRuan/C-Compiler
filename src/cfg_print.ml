@@ -9,6 +9,8 @@ let rec dump_cfgexpr : expr -> string = function
   | Eint i -> Format.sprintf "%d" i
   | Evar s -> Format.sprintf "%s" s
   | Ecall (str, args) -> Format.sprintf "%s(%s)" str (String.concat "," (List.map dump_cfgexpr args))
+  | Estk i -> Format.sprintf "Stk %d" i
+  | Eload (e, sz) -> Format.sprintf "load (%s) (%d bytes)" (dump_cfgexpr e) sz
 
 let dump_list_cfgexpr l =
   l |> List.map dump_cfgexpr |> String.concat ", "
@@ -18,6 +20,7 @@ let dump_arrows oc fname n (node: cfg_node) =
   match node with
   | Cassign (_, _, succ)
   | Ccall (_, _, succ)
+  | Cstore (_, _, _, succ)
   | Cnop succ ->
     Format.fprintf oc "n_%s_%d -> n_%s_%d\n" fname n fname succ
   | Creturn _ -> ()
@@ -34,6 +37,7 @@ let dump_cfg_node oc (node: cfg_node) =
   | Ccmp (e, _, _) -> Format.fprintf oc "%s" (dump_cfgexpr e)
   | Cnop _ -> Format.fprintf oc "nop"
   | Ccall (str, args, _) -> Format.fprintf oc "%s(%s)" str (String.concat "," (List.map dump_cfgexpr args))
+  | Cstore (e1, e2, sz, _) -> Format.fprintf oc "%s <- %s (%d bytes)" (dump_cfgexpr e1) (dump_cfgexpr e2) sz
 
 
 let dump_liveness_state oc ht state =

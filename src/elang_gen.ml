@@ -158,6 +158,11 @@ let rec make_eexpr_of_ast (typ_var: (string, typ) Hashtbl.t) (typ_fun: (string, 
   | Error msg -> Error (Format.sprintf "In make_eexpr_of_ast %s:\n%s"
                           (string_of_ast a) msg)
 
+let var_in_eaddr_of (e: expr) : (string res) =
+  match e with 
+  | Eaddrof (Evar str) -> OK str
+  | _ -> Error (Format.sprintf "Trying to get address of something that is not a variable: %s" (dump_eexpr e))
+
 let rec make_evar_of_ast (typ_var: (string, typ) Hashtbl.t) (a: tree): (bool * string * typ option) res =
   match a with
   | Node(Tvar, [StringLeaf vname]) -> OK (false, vname, None)
